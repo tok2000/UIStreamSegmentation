@@ -1,7 +1,9 @@
 import pandas as pd
 import warnings
+import pm4py
 
-import directly_follows_graph
+import strong_connected_comp
+#import directly_follows_graph
 
 pd.options.mode.chained_assignment = None
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -58,7 +60,7 @@ def preprocessV1(log):
 
 def preprocess(log):
     df = pd.DataFrame()
-    dfg = directly_follows_graph.DFG()
+    activities = set()
 
     def mergeNavigationCellCopy(row1, row2):
 
@@ -87,8 +89,8 @@ def preprocess(log):
 
         return row
 
-    for i in range(0, len(log) - 1):
-        print(i)
+    for i in range(len(log) - 1):
+        #print(i)
         row1 = log.iloc[i]
         row2 = log.iloc[i+1]
 
@@ -101,17 +103,34 @@ def preprocess(log):
             row = row1
 
         df = df.append(row)
+        activities.add(row['eventType'])
 
-        if len(df) == 1:
-            dfg.update()
-        elif len(df) > 1:
-            row = segment(df.iloc[-1], df.iloc[-2])
+        if i % 1000 == 0:
+            dfg, start_activities, end_activities = pm4py.discover_dfg_typed(df, case_id_key='userID',
+                                                                         activity_key='eventType',
+                                                                         timestamp_key='timeStamp')
+            pm4py.save_vis_performance_dfg(dfg, start_activities, end_activities, 'perf_dfg_' + str(i) + '.svg')
 
+        #if len(df) == 1:
+        #    dfg.update()
+        #elif len(df) > 1:
+        #    row = segment(df.iloc[-1], df.iloc[-2])
+
+    dfg, start_activities, end_activities = pm4py.discover_dfg_typed(df, case_id_key='userID', activity_key='eventType',
+                                                               timestamp_key='timeStamp')
+
+    print("dfg:")
+    print(dfg)
+    print("activities:")
+    print(activities)
+    sccs = strong_connected_comp.discover_scc(activities, dfg)
+    pm4py.save_vis_performance_dfg(dfg, start_activities, end_activities, 'perf_dfg.svg')
     return df
 
 log_name = 'StudentRecord'
 with open(log_name + '.csv') as log:
     df = pd.read_csv(log, sep=',')
     df = df.sort_values(by=['timeStamp'], ignore_index=True)
+    df['timeStamp'] = pd.to_datetime(df['timeStamp'])
     df = preprocess(df)
-    df.to_csv(log_name + '_preprocessed.csv', sep=',', index=False)
+    #df.to_csv(log_name + '_preprocessed.csv', sep=',', index=False)
