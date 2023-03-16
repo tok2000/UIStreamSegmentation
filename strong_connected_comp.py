@@ -1,4 +1,4 @@
-def discover_scc(vertices, dfg):
+def discover_scc(vertices, edges):
     """
     Find the strongly connected components of a directed graph.
     Uses a recursive linear-time algorithm described by Tarjan [2]_ to find all
@@ -44,7 +44,6 @@ def discover_scc(vertices, dfg):
     stack = []
     index = {}
     lowlink = {}
-    edges = {}
 
     def dfs(v):
         # Set the depth index for v to the smallest unused index
@@ -62,23 +61,15 @@ def discover_scc(vertices, dfg):
                 # Successor w is in stack S and hence in the current SCC
                 # If w is not on stack, then (v, w) is an edge pointing to an SCC already found and must be ignored
                 lowlink[v] = min(lowlink[v], index[w])
+                # be = (v, w)
 
         # If v is a root node, pop the stack and generate an SCC
         if lowlink[v] == index[v]:
-            scc = set(stack[index[v]:])
+            scc = list(stack[index[v]:])
             del stack[index[v]:]
             identified.update(scc)
+            scc = [scc, v]
             yield scc
-
-    for edge in dfg:
-        src = edge[0]
-        tgt = edge[1]
-        if src in edges:
-            edges[src].append(tgt)
-        else:
-            edges[src] = [tgt]
-    print("edges:")
-    print(edges)
 
     for v in vertices:
         if v not in index:
