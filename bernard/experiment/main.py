@@ -16,12 +16,12 @@ k = 1000
 # STEP 1: reading CSV and preprocessing
 path = '../datasets/synthetic/synthetic_1_delay0.1.csv'
 
-group_by = 'journey_id' # CSV_COLUMN: Long running cases we would like to partition
-activity = 'event'      # CSV_COLUMN: event
-time = 'timestamp'      # CSV_COLUMN: timestamp column
+group_by = 'journey_id'  # CSV_COLUMN: Long running cases we would like to partition
+activity = 'event'  # CSV_COLUMN: event
+time = 'timestamp'  # CSV_COLUMN: timestamp column
 
 # Read CSV
-f = pd.read_csv(path, nrows=None, dtype={group_by:str, activity:str})
+f = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
 f.sort_values(by=[group_by, time], inplace=True)
 
 df = pd.DataFrame()
@@ -50,33 +50,34 @@ for i in range(1, len(f)):
     if not math.isnan(x_1):
         if not math.isnan(x_0):
             if pair not in pairs:
-                pairs.update({pair : [1, x_0]})
+                pairs.update({pair: [1, x_0]})
             else:
                 pairs[pair][0] += 1
                 pair_mean = pairs[pair][1]
                 pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
                 pairs[pair][1] = pair_mean_new
-                #pair_var = ((pairs[pair][0] - 2) * pairs[pair][2] + (pairs[pair][0] - 1) *
+                # pair_var = ((pairs[pair][0] - 2) * pairs[pair][2] + (pairs[pair][0] - 1) *
                 #            ((pair_mean - pair_mean_new) ** 2) + ((x_0 - pair_mean_new) ** 2)) / (pairs[pair][0] - 1)
-                #pair_st_dev = pair_var ** 0.5
-                #pairs[pair][2] = pair_var
+                # pair_st_dev = pair_var ** 0.5
+                # pairs[pair][2] = pair_var
         pred['TOK_MPTAP'] = pairs[pair][1]
-        #print(pairs[pair][1])
-        #print(mean)
-        #print(st_dev)
+        # print(pairs[pair][1])
+        # print(mean)
+        # print(st_dev)
 
         if pairs[pair][1] > mean + st_dev * 0.12:
             c += 1
-            #print(str(True) + str(c))
+            # print(str(True) + str(c))
             pred['TOK_MPTAP_is_cut'] = True
         mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
-        mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + ((pairs[pair][1] - mptap_mean_new) ** 2)) / i
+        mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
+                    (pairs[pair][1] - mptap_mean_new) ** 2)) / i
         mptap_st_dev = mptap_var ** 0.5
         mptap_mean = mptap_mean_new
 
         if x_1 > mean + st_dev * 0.8:
             current['TOK_TAP_is_cut'] = True
-        mean_new = (x_1 + i * mean) / (i+1)
+        mean_new = (x_1 + i * mean) / (i + 1)
         var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_1 - mean_new) ** 2)) / i
         st_dev = var ** 0.5
         mean = mean_new
@@ -87,7 +88,6 @@ for i in range(1, len(f)):
     pred = current
 df = df.append(current)
 
-
 # METHOD 1: TAP (using only the time to predict the case id)
 # We simply insert a cut at the largest time difference
 # and use a cumsum to assign a case_id
@@ -95,7 +95,7 @@ df['TAP_is_cut'] = False
 df.loc[df['time_diff'].nlargest(k).index, 'TAP_is_cut'] = True
 df['TAP_discovered_case'] = df['TAP_is_cut'].shift(1).cumsum().fillna(0)
 df['next_guess_col'] = df['case'].shift(-1)
-df['new_guess_col'] = (df['next_guess_col']!=df['case'])|(df['next_guess_col'].isna())
+df['new_guess_col'] = (df['next_guess_col'] != df['case']) | (df['next_guess_col'].isna())
 
 '''
 tap = 0
@@ -152,7 +152,6 @@ df['MPTAP_is_cut'] = False
 df.loc[df['MPTAP'].nlargest(k).index, 'MPTAP_is_cut'] = True
 df['MPTAP_discovered_case'] = df['MPTAP_is_cut'].shift(1).cumsum().fillna(0)
 
-
 mptap = 0
 tok = 0
 both = 0
@@ -169,7 +168,6 @@ for i in range(len(df)):
 print("mptap: " + str(mptap))
 print("tok: " + str(tok))
 print("both: " + str(both))
-
 
 mptap = 0
 mptap_wrong = 0
@@ -196,4 +194,4 @@ print("mptap_wro: " + str(mptap_wrong))
 print("tok_wro: " + str(tok_wrong))
 
 print(df.head(1000).to_string())
-#print(pairs)
+# print(pairs)
