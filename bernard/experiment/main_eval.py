@@ -1,6 +1,8 @@
 import math
 import pandas as pd
+import numpy as np
 import warnings
+import editdistance
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
@@ -13,8 +15,8 @@ which contains 10 customer journeys into 1000 distinct event logs
 '''
 
 k = 21744
-tap_factors = [1]
-mptap_factors = [1]
+tap_factors = [0.5, 1]
+mptap_factors = [0.5, 1]
 warm_ups = [0]  # , 100, 500, 1000, 5000]
 
 # STEP 1: reading CSV and preprocessing
@@ -54,7 +56,7 @@ mptap_st_dev = 0
 varco = 0
 mptap_varco = 0
 pairs = {}
-for i in range(1, 1000): #len(dataframe)):
+for i in range(1, len(dataframe)):
     if i % 500 == 0:
         print(i)
     current = dataframe.iloc[i]
@@ -86,7 +88,7 @@ for i in range(1, 1000): #len(dataframe)):
 
         mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
         mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
-                    (pairs[pair][1] - mptap_mean_new) ** 2)) / i
+                (pairs[pair][1] - mptap_mean_new) ** 2)) / i
         mptap_st_dev = mptap_var ** 0.5
         mptap_mean = mptap_mean_new
         mptap_varco = mptap_st_dev / mptap_mean
@@ -100,10 +102,10 @@ for i in range(1, 1000): #len(dataframe)):
         st_dev = var ** 0.5
         mean = mean_new
         varco = st_dev / mean
-        #print(i)
-        #print('st_dev: ' + str(st_dev))
-        #print('varco: ' + str(varco))
-        #print('sen: ' + str(sen))
+        # print(i)
+        # print('st_dev: ' + str(st_dev))
+        # print('varco: ' + str(varco))
+        # print('sen: ' + str(sen))
 
     df = df.append(pred)
     e_0 = e_1
@@ -120,49 +122,6 @@ df['TAP_is_cut'] = False
 df.loc[df[time_diff].nlargest(k).index, 'TAP_is_cut'] = True
 df['TAP_discovered_case'] = df['TAP_is_cut'].shift(1).cumsum().fillna(0)
 
-results_tap = pd.DataFrame()
-results_tap.index = ['tap', 'tok', 'both', 'tap_corr', 'tok_corr', 'traces', 'tap_wrong', 'tok_wrong']
-
-for f in tap_factors:
-    for w in warm_ups:
-        print('tap: f: ' + str(f) + ', w: ' + str(w))
-        tap = 0
-        tok = 0
-        both = 0
-        for i in range(w, len(df)):
-            if df.iloc[i]['TAP_is_cut']:
-                if df.iloc[i]['TOK_TAP_' + str(f) + '_is_cut']:
-                    both += 1
-                else:
-                    tap += 1
-            else:
-                if df.iloc[i]['TOK_TAP_' + str(f) + '_is_cut']:
-                    tok += 1
-
-        tap_corr = 0
-        tap_wrong = 0
-        tok_corr = 0
-        tok_wrong = 0
-        traces = 0
-        for i in range(w, len(df)):
-            if df.iloc[i]['new_guess_col']:
-                traces += 1
-                if df.iloc[i]['TAP_is_cut']:
-                    tap_corr += 1
-                if df.iloc[i]['TOK_TAP_' + str(f) + '_is_cut']:
-                    tok_corr += 1
-            else:
-                if df.iloc[i]['TAP_is_cut']:
-                    tap_wrong += 1
-                if df.iloc[i]['TOK_TAP_' + str(f) + '_is_cut']:
-                    tok_wrong += 1
-
-        results_tap.insert(0, 'ftap_' + str(f) + '_wu_' + str(w),
-                           [tap, tok, both, tap_corr, tok_corr, traces, tap_wrong, tok_wrong], True)
-
-print(results_tap.to_string())
-results_tap.to_excel('./results/tap_res_new1.xlsx')
-
 # METHOD 2: LCPAP (using the mean time between pairs of events)
 # Same as method 1, but we replace the true time difference
 # by the average time difference per pair of events
@@ -174,53 +133,13 @@ df['MPTAP_is_cut'] = False
 df.loc[df['MPTAP'].nlargest(k).index, 'MPTAP_is_cut'] = True
 df['MPTAP_discovered_case'] = df['MPTAP_is_cut'].shift(1).cumsum().fillna(0)
 
-results_mptap = pd.DataFrame()
-results_mptap.index = ['mptap', 'tok', 'both', 'mptap_corr', 'tok_corr', 'traces', 'mptap_wrong', 'tok_wrong']
 
-for f in mptap_factors:
-    for w in warm_ups:
-        print('mptap: f: ' + str(f) + ', w: ' + str(w))
-        mptap = 0
-        tok = 0
-        both = 0
-        for i in range(w, len(df)):
-            if df.iloc[i]['MPTAP_is_cut']:
-                if df.iloc[i]['TOK_MPTAP_' + str(f) + '_is_cut']:
-                    both += 1
-                else:
-                    mptap += 1
-            else:
-                if df.iloc[i]['TOK_MPTAP_' + str(f) + '_is_cut']:
-                    tok += 1
-
-        mptap_corr = 0
-        mptap_wrong = 0
-        tok_corr = 0
-        tok_wrong = 0
-        traces = 0
-        for i in range(w, len(df)):
-            if df.iloc[i]['new_guess_col']:
-                traces += 1
-                if df.iloc[i]['MPTAP_is_cut']:
-                    mptap_corr += 1
-                if df.iloc[i]['TOK_MPTAP_' + str(f) + '_is_cut']:
-                    tok_corr += 1
-            else:
-                if df.iloc[i]['MPTAP_is_cut']:
-                    mptap_wrong += 1
-                if df.iloc[i]['TOK_MPTAP_' + str(f) + '_is_cut']:
-                    tok_wrong += 1
-        results_mptap.insert(0, 'fmptap_' + str(f) + '_wu_' + str(w),
-                             [mptap, tok, both, mptap_corr, tok_corr, traces, mptap_wrong, tok_wrong], True)
-
-# print(df.head(500).to_string())
-# print(pairs)
-
-print(results_mptap.to_string())
-results_mptap.to_excel('./results/mptap_res_new1.xlsx')
-
-
-df = df.reset_index()
+def get_all_uis(df):
+    all_uis = []
+    for i in range(len(df)):
+        all_uis.append(df.iloc[i][0])
+    # print(all_uis)
+    return all_uis
 
 
 def find_partitions(df, label):
@@ -231,16 +150,108 @@ def find_partitions(df, label):
         if df.iloc[i][label]:
             partition.append(section)
             section = []
-    print(label + str(partition))
+    # print(label + str(partition))
     return partition
 
 
-find_partitions(df, 'new_guess_col')
-find_partitions(df, 'TAP_is_cut')
-find_partitions(df, 'MPTAP_is_cut')
-for f in tap_factors:
-    find_partitions(df, 'TOK_TAP_' + str(f) + '_is_cut')
-for f in mptap_factors:
-    find_partitions(df, 'TOK_MPTAP_' + str(f) + '_is_cut')
+def get_edit_distance(df, label):
+    edit_distances = []
+    all_uis = get_all_uis(df)
+    discovered_segments = find_partitions(df, label)
+    true_segments = find_partitions(df, 'new_guess_col')
+    # print(discovered_segments)
+    # print(true_segments)
 
-df.to_csv('./results/real_transformed_processed.csv')
+    for discovered_seg in discovered_segments:
+        covered_traces = []
+        for true_seg in true_segments:
+            if any([i in discovered_seg for i in true_seg]) and len(true_seg) > 0:
+                covered_traces.append(true_seg)
+
+        edit_distance = 1
+        min_seg = []
+        for true_seg in covered_traces:
+            dist = (editdistance.eval([all_uis[i] for i in discovered_seg if i < len(all_uis)],
+                                      [all_uis[i] for i in true_seg if i < len(all_uis)]) / max(len(discovered_seg),
+                                                                                                len(true_seg)))
+            if dist < edit_distance:
+                edit_distance = dist
+                min_seg = true_seg
+        # print("disc", discovered_seg)
+        # print("min_true", min_seg)
+        if len(min_seg) > 0:
+            # print(edit_distance)
+            edit_distances.append(edit_distance)
+    mean_edit_distance = np.mean(edit_distances)
+    return mean_edit_distance
+
+
+def get_statistics(corr, wrong, traces):
+    precision = corr / (corr + wrong)
+    recall = corr / traces
+    fscore = 2 * precision * recall / (precision + recall)
+    return precision, recall, fscore
+
+
+def get_metrics(df, results, f, w, label):
+    print(label + ': f: ' + str(f) + ', w: ' + str(w))
+
+    bern_corr = 0
+    bern_wrong = 0
+    tok_corr = 0
+    tok_wrong = 0
+    traces = 0
+    for i in range(w, len(df)):
+        if df.iloc[i]['new_guess_col']:
+            traces += 1
+            if df.iloc[i][label + '_is_cut']:
+                bern_corr += 1
+            if df.iloc[i]['TOK_' + label + '_' + str(f) + '_is_cut']:
+                tok_corr += 1
+        else:
+            if df.iloc[i][label + '_is_cut']:
+                bern_wrong += 1
+            if df.iloc[i]['TOK_' + label + '_' + str(f) + '_is_cut']:
+                tok_wrong += 1
+
+    prec_bern, rec_bern, f_bern = get_statistics(bern_corr, bern_wrong, traces)
+    prec_tok, rec_tok, f_tok = get_statistics(tok_corr, tok_wrong, traces)
+
+    results.insert(0, label + '_' + str(f) + '_wu_' + str(w),
+                   [traces, bern_corr, bern_wrong, prec_bern, rec_bern, f_bern, tok_corr, tok_wrong, prec_tok, rec_tok,
+                    f_tok], True)
+    return results
+
+
+def evaluate(df):
+    results = pd.DataFrame()
+    results.index = ['traces', 'tap_corr', 'tap_wrong', 'prec_tap', 'recall_tap', 'fscore_tap', 'tok_corr',
+                     'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok']
+
+    for f in tap_factors:
+        for w in warm_ups:
+            results = get_metrics(df, results, f, w, 'TAP')
+        print('tok_tap_ed', get_edit_distance(df, 'TOK_TAP_' + str(f) + '_is_cut'))
+
+    print('bernard_tap_ed', get_edit_distance(df, 'TAP_is_cut'))
+
+    print(results.to_string())
+    results.to_excel('./results/tap_res_new1.xlsx')
+
+    results = pd.DataFrame()
+    results.index = ['traces', 'mptap_corr', 'mptap_wrong', 'prec_mptap', 'recall_mptap', 'fscore_mptap', 'tok_corr',
+                     'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok']
+
+    for f in mptap_factors:
+        for w in warm_ups:
+            results = get_metrics(df, results, f, w, 'MPTAP')
+        print('tok_mptap_ed', get_edit_distance(df, 'TOK_MPTAP_' + str(f) + '_is_cut'))
+
+    print('bernard_mptap_ed', get_edit_distance(df, 'MPTAP_is_cut'))
+
+    print(results.to_string())
+    results.to_excel('./results/mptap_res_new1.xlsx')
+
+
+df = df.reset_index()
+evaluate(df)

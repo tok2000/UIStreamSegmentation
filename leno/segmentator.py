@@ -126,9 +126,9 @@ def preprocess(log):
         else:
             row = row1
 
-        if pd.notnull(row['target.name']): # and row['eventType'] != "paste":
-            row['eventType_concrete'] = str(row['eventType']) + '[' + str(row['target.name']) + ']'
-        elif row['eventType'] == "clickButton" and pd.notnull(row['target.type']):
+        # if pd.notnull(row['target.name']) and row['eventType'] != "paste":
+        #    row['eventType_concrete'] = str(row['eventType']) + '[' + str(row['target.name']) + ']'
+        if row['eventType'] == "clickButton" and pd.notnull(row['target.type']):
             row['eventType_concrete'] = str(row['eventType']) + '[' + str(row['target.type']) + ']'
         else:
             row['eventType_concrete'] = row['eventType']
@@ -158,6 +158,26 @@ def preprocess(log):
     dfg, start_activities, end_activities = pm4py.discover_dfg_typed(df, case_id_key='userID',
                                                                      activity_key='eventType_concrete',
                                                                      timestamp_key='timeStamp')
+
+    events3 = {}
+    for k in range(len(df) - 5):
+        changed = False
+        r1 = df.loc[k, 'eventType_concrete']
+        r2 = df.loc[k + 1, 'eventType_concrete']
+        r3 = df.loc[k + 2, 'eventType_concrete']
+        r4 = df.loc[k + 3, 'eventType_concrete']
+        r5 = df.loc[k + 4, 'eventType_concrete']
+        triplet = (r1, r2, r3, r4, r5)
+        for trip in events3:
+            if set(trip).issubset(set(triplet)):
+                events3[trip] += 1
+                changed = True
+                break
+        if not changed:
+            events3[triplet] = 1
+
+    print("triplets:")
+    print(events3)
 
     df.drop(['eventType_concrete'], axis=1, inplace=True)
     print("dfg:")
