@@ -1,3 +1,4 @@
+import datetime
 import math
 import pandas as pd
 import numpy as np
@@ -8,130 +9,180 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
 
-'''
-This is a very simple example to describe how customer journey partitioning can be performed using the
-3 techniques described in the paper. Let's say we would like to partition the event logs synthetic_1_delay2.0.csv
-which contains 10 customer journeys into 1000 distinct event logs
-'''
 
-k = 21744
-tap_factors = [0.5, 1]
-mptap_factors = [0.5, 1]
-warm_ups = [0]  # , 100, 500, 1000, 5000]
+def real_transformed_log(tap_factors, mptap_factors):
+    k = 21744
 
-# STEP 1: reading CSV and preprocessing
-path = '../datasets/real/real_transformed.csv'
+    # STEP 1: reading CSV and preprocessing
+    path = '../datasets/real/real_transformed.csv'
+    group_by = 'customer_id'  # CSV_COLUMN: Long running cases we would like to partition
+    activity = 'activity'  # CSV_COLUMN: event
+    time = 'time'  # CSV_COLUMN: timestamp column
+    ground_truth = 'ticket_id'
+    time_diff = 'time_diff'
 
-group_by = 'customer_id'  # CSV_COLUMN: Long running cases we would like to partition
-activity = 'activity'  # CSV_COLUMN: event
-time = 'time'  # CSV_COLUMN: timestamp column
-ground_truth = 'ticket_id'
-time_diff = 'time_diff'
-
-# Read CSV
-dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
-dataframe.sort_values(by=[group_by, time], inplace=True)
-dataframe = dataframe[dataframe[time_diff].notna()]
-dataframe['next_guess_col'] = dataframe[ground_truth].shift(-1)
-dataframe['new_guess_col'] = (dataframe['next_guess_col'] != dataframe[ground_truth]) | (
-    dataframe['next_guess_col'].isna())
-dataframe.drop(['next_guess_col'], axis=1, inplace=True)
-
-# print(dataframe.head(100).to_string())
+    dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
+    return preprocess(dataframe, k, tap_factors, mptap_factors, group_by, activity, time, ground_truth, time_diff)
 
 
-df = pd.DataFrame()
+def synthetic_log(delay, tap_factors, mptap_factors):
+    k = 1000
 
-pred = dataframe.iloc[0]
-for f in tap_factors:
-    pred['TOK_TAP_' + str(f) + '_is_cut'] = False
-e_0 = pred[activity]
-x_0 = pred[time_diff]
-mean = x_0
-mptap_mean = 0
-var = 0
-mptap_var = 0
-st_dev = 0
-mptap_st_dev = 0
-varco = 0
-mptap_varco = 0
-pairs = {}
-for i in range(1, len(dataframe)):
-    if i % 500 == 0:
-        print(i)
-    current = dataframe.iloc[i]
-    e_1 = current[activity]
-    pair = e_0 + '_' + e_1
+    path_base = '../datasets/synthetic/synthetic_1_'
+    path = path_base + delay + '.csv'
+
+    group_by = 'journey_id'
+    activity = 'event'
+    time = 'timestamp'
+    time_diff = 'time_diff'
+
+    # Read CSV
+    dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
+    dataframe.sort_values(by=[group_by, time], inplace=True)
+    dataframe = dataframe[dataframe[time_diff].notna()]
+    dataframe['new_guess_col'] = dataframe['last_trace']
+    dataframe.drop(['last_trace'], axis=1, inplace=True)
+
+    return segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff)
+
+
+def leno_log(log_name, tap_factors, mptap_factors):
+    k = 50
+
+    # STEP 1: reading CSV and preprocessing
+    path = '../../leno/' + log_name + '_preprocessed.csv'
+    group_by = 'userID'  # CSV_COLUMN: Long running cases we would like to partition
+    activity = 'eventType'  # CSV_COLUMN: event
+    time = 'timeStamp'  # CSV_COLUMN: timestamp column
+    ground_truth = 'case_id'
+    time_diff = 'time_diff'
+
+    dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
+    dataframe[time] = pd.to_datetime(dataframe[time])
+    dataframe[time_diff] = dataframe.groupby(group_by)[time].shift(-1) - dataframe[time]
+    dataframe[time_diff] = dataframe[time_diff].fillna(dataframe[time_diff].max())
+    return preprocess(dataframe, k, tap_factors, mptap_factors, group_by, activity, time, ground_truth, time_diff)
+
+
+def preprocess(dataframe, k, tap_factors, mptap_factors, group_by, activity, time, ground_truth, time_diff):
+    dataframe.sort_values(by=[group_by, time], inplace=True)
+    dataframe = dataframe[dataframe[time_diff].notna()]
+    dataframe['next_guess_col'] = dataframe[ground_truth].shift(-1)
+    dataframe['new_guess_col'] = (dataframe['next_guess_col'] != dataframe[ground_truth]) | (
+        dataframe['next_guess_col'].isna())
+    dataframe.drop(['next_guess_col'], axis=1, inplace=True)
+
+    return segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff)
+
+    # print(dataframe.head(100).to_string())
+
+
+def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
+    df = pd.DataFrame()
+
+    pred = dataframe.iloc[0]
+    if isinstance(pred[time_diff], datetime.timedelta):
+        pred[time_diff] = pred[time_diff].total_seconds()
     for f in tap_factors:
-        current['TOK_TAP_' + str(f) + '_is_cut'] = False
-    for f in mptap_factors:
-        pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
-    x_1 = current[time_diff]
-    if not math.isnan(x_1):
-        if not math.isnan(x_0):
-            if pair not in pairs:
-                pairs.update({pair: [1, x_0]})
-            else:
-                pairs[pair][0] += 1
-                pair_mean = pairs[pair][1]
-                pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
-                pairs[pair][1] = pair_mean_new
-                # pair_var = ((pairs[pair][0] - 2) * pairs[pair][2] + (pairs[pair][0] - 1) *
-                #            ((pair_mean - pair_mean_new) ** 2) + ((x_0 - pair_mean_new) ** 2)) / (pairs[pair][0] - 1)
-                # pair_st_dev = pair_var ** 0.5
-                # pairs[pair][2] = pair_var
-        pred['TOK_MPTAP'] = pairs[pair][1]
-
-        for f in mptap_factors:
-            if pairs[pair][1] > mean + varco * f:
-                pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
-
-        mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
-        mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
-                (pairs[pair][1] - mptap_mean_new) ** 2)) / i
-        mptap_st_dev = mptap_var ** 0.5
-        mptap_mean = mptap_mean_new
-        mptap_varco = mptap_st_dev / mptap_mean
-
+        pred['TOK_TAP_' + str(f) + '_is_cut'] = False
+    e_0 = pred[activity]
+    x_0 = pred[time_diff]
+    mean = x_0
+    var = 0
+    st_dev = 0
+    varco = 0
+    mptap_mean = 0
+    mptap_var = 0
+    mptap_st_dev = 0
+    mptap_varco = 1
+    pairs = {}
+    for i in range(1, len(dataframe)):
+        if i % 500 == 0:
+            print(i)
+        current = dataframe.iloc[i]
+        if isinstance(current[time_diff], datetime.timedelta):
+            current[time_diff] = current[time_diff].total_seconds()
+        e_1 = current[activity]
+        pair = e_0 + '_' + e_1
         for f in tap_factors:
-            if x_1 > mean + varco * f:
-                current['TOK_TAP_' + str(f) + '_is_cut'] = True
+            current['TOK_TAP_' + str(f) + '_is_cut'] = False
+        for f in mptap_factors:
+            pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
+        x_1 = current[time_diff]
+        if not math.isnan(x_1):
+            if not math.isnan(x_0):
+                if pair not in pairs:
+                    pairs.update({pair: [1, x_0]})
+                else:
+                    pairs[pair][0] += 1
+                    pair_mean = pairs[pair][1]
+                    pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
+                    pairs[pair][1] = pair_mean_new
+                    # pair_var = ((pairs[pair][0] - 2) * pairs[pair][2] + (pairs[pair][0] - 1) *
+                    #            ((pair_mean - pair_mean_new) ** 2) + ((x_0 - pair_mean_new) ** 2)) / (pairs[pair][0] - 1)
+                    # pair_st_dev = pair_var ** 0.5
+                    # pairs[pair][2] = pair_var
+            pred['TOK_MPTAP'] = pairs[pair][1]
 
-        mean_new = (x_1 + i * mean) / (i + 1)
-        var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_1 - mean_new) ** 2)) / i
-        st_dev = var ** 0.5
-        mean = mean_new
-        varco = st_dev / mean
-        # print(i)
-        # print('st_dev: ' + str(st_dev))
-        # print('varco: ' + str(varco))
-        # print('sen: ' + str(sen))
+            for f in mptap_factors:
+                if pairs[pair][1] > mptap_mean * mptap_varco * f:
+                    pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
 
-    df = df.append(pred)
-    e_0 = e_1
-    x_0 = x_1
-    pred = current
-df = df.append(current)
+            mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
+            mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
+                    (pairs[pair][1] - mptap_mean_new) ** 2)) / i
+            mptap_st_dev = mptap_var ** 0.5
+            mptap_mean = mptap_mean_new
+            mptap_varco = mptap_st_dev / mptap_mean
 
-print(df.head(100).to_string())
+            for f in tap_factors:
+                if x_1 > mean + varco * f:
+                    current['TOK_TAP_' + str(f) + '_is_cut'] = True
+
+            mean_new = (x_1 + i * mean) / (i + 1)
+            var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_1 - mean_new) ** 2)) / i
+            st_dev = var ** 0.5
+            mean = mean_new
+            varco = st_dev / mean
+            # print(i)
+            # print('st_dev: ' + str(st_dev))
+            # print('varco: ' + str(varco))
+            # print('sen: ' + str(sen))
+
+        df = df.append(pred)
+        e_0 = e_1
+        x_0 = x_1
+        pred = current
+    df = df.append(current)
+
+    print(df.head(100).to_string())
+    df = bernard_tap(df, k, time_diff)
+    df = bernard_lcpap(df, k, time_diff, activity)
+    return df
+
 
 # METHOD 1: TAP (using only the time to predict the case id)
 # We simply insert a cut at the largest time difference
 # and use a cumsum to assign a case_id
-df['TAP_is_cut'] = False
-df.loc[df[time_diff].nlargest(k).index, 'TAP_is_cut'] = True
-df['TAP_discovered_case'] = df['TAP_is_cut'].shift(1).cumsum().fillna(0)
+def bernard_tap(df, k, time_diff):
+    df['TAP_is_cut'] = False
+    df.loc[df[time_diff].nlargest(k).index, 'TAP_is_cut'] = True
+    df['TAP_discovered_case'] = df['TAP_is_cut'].shift(1).cumsum().fillna(0)
+    return df
+
 
 # METHOD 2: LCPAP (using the mean time between pairs of events)
 # Same as method 1, but we replace the true time difference
 # by the average time difference per pair of events
-df['next_activity'] = df[activity].shift(-1)
-df['pair'] = df[activity].astype(str) + '_' + df['next_activity'].astype(str)
-mapping = df.groupby('pair')[time_diff].mean()
-df['MPTAP'] = df['pair'].map(mapping)
-df['MPTAP_is_cut'] = False
-df.loc[df['MPTAP'].nlargest(k).index, 'MPTAP_is_cut'] = True
-df['MPTAP_discovered_case'] = df['MPTAP_is_cut'].shift(1).cumsum().fillna(0)
+def bernard_lcpap(df, k, time_diff, activity):
+    df['next_activity'] = df[activity].shift(-1)
+    df['pair'] = df[activity].astype(str) + '_' + df['next_activity'].astype(str)
+    mapping = df.groupby('pair')[time_diff].mean()
+    df['MPTAP'] = df['pair'].map(mapping)
+    df['MPTAP_is_cut'] = False
+    df.loc[df['MPTAP'].nlargest(k).index, 'MPTAP_is_cut'] = True
+    df['MPTAP_discovered_case'] = df['MPTAP_is_cut'].shift(1).cumsum().fillna(0)
+    return df
 
 
 def get_all_uis(df):
@@ -187,13 +238,24 @@ def get_edit_distance(df, label):
 
 
 def get_statistics(corr, wrong, traces):
-    precision = corr / (corr + wrong)
-    recall = corr / traces
-    fscore = 2 * precision * recall / (precision + recall)
+    try:
+        precision = corr / (corr + wrong)
+    except ZeroDivisionError:
+        precision = 0
+
+    try:
+        recall = corr / traces
+    except ZeroDivisionError:
+        recall = 1
+
+    try:
+        fscore = 2 * precision * recall / (precision + recall)
+    except ZeroDivisionError:
+        fscore = 0
     return precision, recall, fscore
 
 
-def get_metrics(df, results, f, w, label):
+def get_metrics(df, results, f, w, label, med_bern):
     print(label + ': f: ' + str(f) + ', w: ' + str(w))
 
     bern_corr = 0
@@ -216,42 +278,63 @@ def get_metrics(df, results, f, w, label):
 
     prec_bern, rec_bern, f_bern = get_statistics(bern_corr, bern_wrong, traces)
     prec_tok, rec_tok, f_tok = get_statistics(tok_corr, tok_wrong, traces)
+    med_tok = get_edit_distance(df.iloc[w:], 'TOK_' + label + '_' + str(f) + '_is_cut')
 
     results.insert(0, label + '_' + str(f) + '_wu_' + str(w),
-                   [traces, bern_corr, bern_wrong, prec_bern, rec_bern, f_bern, tok_corr, tok_wrong, prec_tok, rec_tok,
-                    f_tok], True)
+                   [traces, bern_corr, bern_wrong, prec_bern, rec_bern, f_bern, med_bern, tok_corr, tok_wrong, prec_tok,
+                    rec_tok, f_tok, med_tok], True)
     return results
 
 
-def evaluate(df):
+def evaluate(df, log_name, tap_factors, mptap_factors, warm_ups):
     results = pd.DataFrame()
-    results.index = ['traces', 'tap_corr', 'tap_wrong', 'prec_tap', 'recall_tap', 'fscore_tap', 'tok_corr',
-                     'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok']
+    results.index = ['traces', 'tap_corr', 'tap_wrong', 'prec_tap', 'recall_tap', 'fscore_tap', 'med_tap', 'tok_corr',
+                     'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok', 'med_tok']
+
+    # med_tap = get_edit_distance(df, 'TAP_is_cut')
 
     for f in tap_factors:
         for w in warm_ups:
-            results = get_metrics(df, results, f, w, 'TAP')
-        print('tok_tap_ed', get_edit_distance(df, 'TOK_TAP_' + str(f) + '_is_cut'))
-
-    print('bernard_tap_ed', get_edit_distance(df, 'TAP_is_cut'))
+            med_tap = get_edit_distance(df.iloc[w:], 'TAP_is_cut')
+            results = get_metrics(df, results, f, w, 'TAP', med_tap)
 
     print(results.to_string())
-    results.to_excel('./results/tap_res_new1.xlsx')
+    results.to_excel('./results/tap_res_tryout_' + log_name + '.xlsx')
 
     results = pd.DataFrame()
-    results.index = ['traces', 'mptap_corr', 'mptap_wrong', 'prec_mptap', 'recall_mptap', 'fscore_mptap', 'tok_corr',
-                     'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok']
+    results.index = ['traces', 'mptap_corr', 'mptap_wrong', 'prec_mptap', 'recall_mptap', 'fscore_mptap', 'med_mptap',
+                     'tok_corr', 'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok', 'med_tok']
+
+    # med_mptap = get_edit_distance(df, 'MPTAP_is_cut')
 
     for f in mptap_factors:
         for w in warm_ups:
-            results = get_metrics(df, results, f, w, 'MPTAP')
-        print('tok_mptap_ed', get_edit_distance(df, 'TOK_MPTAP_' + str(f) + '_is_cut'))
-
-    print('bernard_mptap_ed', get_edit_distance(df, 'MPTAP_is_cut'))
+            med_mptap = get_edit_distance(df.iloc[w:], 'MPTAP_is_cut')
+            results = get_metrics(df, results, f, w, 'MPTAP', med_mptap)
 
     print(results.to_string())
-    results.to_excel('./results/mptap_res_new1.xlsx')
+    results.to_excel('./results/mptap_res_tryout_' + log_name + '.xlsx')
 
 
+tap_factors = [0, 0.25, 0.5, 0.75, 1]
+mptap_factors = [0, 0.25, 0.5, 0.75, 1]
+warm_ups = [0]  # , 100, 500, 1000, 2000]
+all_delays = ['delay2.0', 'delay1.0', 'delay0.5', 'delay0.45', 'delay0.35', 'delay0.3', 'delay0.25', 'delay0.2',
+              'delay0.15', 'delay0.1', 'delay0.05']
+
+df = real_transformed_log(tap_factors, mptap_factors)
 df = df.reset_index()
-evaluate(df)
+evaluate(df, 'real', tap_factors, mptap_factors, warm_ups)
+
+df = leno_log('Reimbursement', tap_factors, mptap_factors)
+df = df.reset_index()
+evaluate(df, 'reimb', tap_factors, mptap_factors, warm_ups)
+
+df = leno_log('StudentRecord', tap_factors, mptap_factors)
+df = df.reset_index()
+evaluate(df, 'student', tap_factors, mptap_factors, warm_ups)
+
+for d in all_delays:
+    df = synthetic_log(d, tap_factors, mptap_factors)
+    df = df.reset_index()
+    evaluate(df, d, tap_factors, mptap_factors, warm_ups)
