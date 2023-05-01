@@ -1,4 +1,6 @@
 index,case_id,timeStamp,userID,targetApp,eventType,url,content,target.workbookName,target.sheetName,target.id,target.class,target.tagName,target.type,target.name,target.value,target.innerText,target.checked,target.href,target.option,target.title,target.innerHTML,in
+-2,0.0,2020-02-25 00:12:09.201000+00:00,vleno,Chrome,clickButton,https://form.jotform.com/200477494954062,,,,input_2,,BUTTON,submit,,,Submit,,,,,\n              Submit\n            ,-1
+-1,0.0,2020-02-25 00:36:09.201000+00:00,vleno,Chrome,clickLink,https://submit.jotform.com/submit/200477494954062/,,,,,,A,,,,Add another response,,https://form.jotform.com/200477494954062,,,Add another response,-1
 0,1.0,2020-02-25 00:36:16.639000+00:00,vleno,Chrome,navigate_to,https://form.jotform.com/200477494954062,,,,,,,,,,,,,,,,
 1,1.0,2020-02-25 00:36:21.105000+00:00,vleno,Excel,copyCell,,John Doe,reimbursement.xlsx,Student details,A2,,,,,John Doe,,,,,,,0
 2,1.0,2020-02-25 00:36:24.282000+00:00,vleno,Chrome,paste,https://form.jotform.com/200477494954062,John Doe,,,first_3,,INPUT,text,q3_name[first],,,,,,,,0

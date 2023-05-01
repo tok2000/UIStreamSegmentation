@@ -50,7 +50,7 @@ def leno_log(log_name, tap_factors, mptap_factors):
     k = 50
 
     # STEP 1: reading CSV and preprocessing
-    path = '../../leno/' + log_name + '_preprocessed_manipulated.csv'
+    path = '../../leno/' + log_name + '_preprocessed.csv'
     group_by = 'userID'  # CSV_COLUMN: Long running cases we would like to partition
     activity = 'eventType'  # CSV_COLUMN: event
     time = 'timeStamp'  # CSV_COLUMN: timestamp column
@@ -96,6 +96,9 @@ def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
     mptap_st_dev = 1
     mptap_varco = 1
     pairs = {}
+
+    time_diffs = []
+
     for i in range(1, len(dataframe)):
         if i % 500 == 0:
             print(i)
@@ -109,6 +112,9 @@ def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
         for f in mptap_factors:
             pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
         x_1 = current[time_diff]
+        time_diffs.append(x_1)
+        if len(time_diffs) > 1000:
+            time_diffs = time_diffs[1:]
         if not math.isnan(x_1):
             if not math.isnan(x_0):
                 #print('x_0', x_0)
@@ -143,7 +149,7 @@ def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
             #print('x1_norm', x_1)
 
             for f in tap_factors:
-                if x_1 > mean + varco * f:
+                if x_1 > np.mean(time_diffs) + st_dev * f:
                     current['TOK_TAP_' + str(f) + '_is_cut'] = True
 
             mean_new = (x_1 + i * mean) / (i + 1)
@@ -306,13 +312,13 @@ def evaluate(df, log_name, tap_factors, mptap_factors, warm_ups):
             results = get_metrics(df, results, f, w, 'TAP', med_tap)
 
     print(results.to_string())
-    results.to_excel('./results/tap_res_varco_' + log_name + '.xlsx', sheet_name=log_name)
+    results.to_excel('./results/tap_res_window_' + log_name + '.xlsx', sheet_name=log_name)
 
     results = pd.DataFrame()
     results.index = ['traces', 'mptap_corr', 'mptap_wrong', 'prec_mptap', 'recall_mptap', 'fscore_mptap', 'med_mptap',
                      'tok_corr', 'tok_wrong', 'prec_tok', 'recall_tok', 'fscore_tok', 'med_tok']
 
-    med_mptap = get_edit_distance(df, 'MPTAP_is_cut')
+    med_mptap = 0.31 #get_edit_distance(df, 'MPTAP_is_cut')
 
     for f in mptap_factors:
         for w in warm_ups:
@@ -320,16 +326,16 @@ def evaluate(df, log_name, tap_factors, mptap_factors, warm_ups):
             results = get_metrics(df, results, f, w, 'MPTAP', med_mptap)
 
     print(results.to_string())
-    results.to_excel('./results/mptap_res_varco_' + log_name + '.xlsx', sheet_name=log_name)
+    #results.to_excel('./results/mptap_res_window_' + log_name + '.xlsx', sheet_name=log_name)
 
 
-tap_factors = [0, 0.25, 0.5, 1]
-mptap_factors = [0, 0.25, 0.5, 1]
+tap_factors = [1]
+mptap_factors = []
 warm_ups = [0]  # , 100, 500, 1000, 2000]
 all_delays = ['delay2.0', 'delay1.0', 'delay0.5', 'delay0.45', 'delay0.35', 'delay0.3', 'delay0.25', 'delay0.2',
               'delay0.15', 'delay0.1', 'delay0.05']
 
-
+'''
 df = leno_log('Reimbursement', tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'reimb', tap_factors, mptap_factors, warm_ups)
@@ -337,13 +343,12 @@ evaluate(df, 'reimb', tap_factors, mptap_factors, warm_ups)
 df = leno_log('StudentRecord', tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'student', tap_factors, mptap_factors, warm_ups)
-'''
+
 df = real_transformed_log(tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'real', tap_factors, mptap_factors, warm_ups)
-
+'''
 for d in all_delays:
     df = synthetic_log(d, tap_factors, mptap_factors)
     df = df.reset_index()
     evaluate(df, d, tap_factors, mptap_factors, warm_ups)
-'''

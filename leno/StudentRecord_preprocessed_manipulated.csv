@@ -1,4 +1,6 @@
 index,case_id,timeStamp,userID,targetApp,eventType,url,content,target.workbookName,target.sheetName,target.id,target.className,target.tagName,target.type,target.name,target.value,target.innerText,target.checked,target.href,target.option,target.title,target.innerHTML
+0,0,2019-10-21 00:09:08.635000+00:00,vleno,Chrome,clickButton,https://forms.zoho.com/universityofmelbourne/form/NewRecord,,,,,fmSmtButton submitColor disabledSubmitButtom,BUTTON,submit,,submit,Submit,,,,,\n<em>Submit</em>\n
+0,0,2019-10-21 00:10:08.635000+00:00,vleno,Chrome,clickLink,https://forms.zoho.com/universityofmelbourne/form/NewRecord/thankyou,,,,,,A,,,,Add another response.,,/universityofmelbourne/form/NewRecord,,," \n<em class=""liveAddIcon flLeft""></em>\n<b>Add another response.</b>\n<div class=""clearBoth""></div>"
 0,1,2019-10-21 00:10:09.640000+00:00,vleno,Excel,copyCell,,John,StudentRecords.xlsx,Sheet1,A2,,,,,John,,,,,,
 0,1,2019-10-21 00:10:12.216000+00:00,vleno,Chrome,paste,https://forms.zoho.com/universityofmelbourne/form/NewRecord,John,,,,,INPUT,text,SingleLine,,,,,,,
 0,1,2019-10-21 00:10:13.281000+00:00,vleno,Chrome,editField,https://forms.zoho.com/universityofmelbourne/form/NewRecord,,,,,,INPUT,text,SingleLine,John,,,,,,
