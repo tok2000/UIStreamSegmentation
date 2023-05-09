@@ -92,6 +92,8 @@ for dataset in datasets:
     for c in ['TAP', 'MPTAP']:
         fpr[c], tpr[c], tresholds[c] = roc_curve(r['new_guess_col'], r[c])
         auc[c] = roc_auc_score(r['new_guess_col'], r[c])
+        print(fpr[c], tpr[c], tresholds[c])
+        print(auc[c])
         plt.plot(fpr[c], tpr[c], label=c)
         o = copy.deepcopy(output)
         o['exec_time'] = exec_time[c]

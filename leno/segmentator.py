@@ -1,9 +1,8 @@
-import math
-
 import pandas as pd
 import warnings
 import pm4py
 import time
+import re
 
 import strong_connected_comp
 
@@ -130,6 +129,7 @@ def preprocess(log):
         #    row['eventType_concrete'] = str(row['eventType']) + '[' + str(row['target.name']) + ']'
         if row['eventType'] == "clickButton" and pd.notnull(row['target.type']):
             row['eventType_concrete'] = str(row['eventType']) + '[' + str(row['target.type']) + ']'
+            row['eventType'] = str(row['eventType']) + '[' + str(row['target.type']) + ']'
         else:
             row['eventType_concrete'] = row['eventType']
 
@@ -141,7 +141,8 @@ def preprocess(log):
         # print(row.to_string())
         # print()
 
-        df = df.append(row, ignore_index=True)
+        df = pd.concat([df, pd.DataFrame(row).transpose()])
+        # print(df.head(100).to_string())
 
         if row['eventType_concrete'] not in activities:
             activities.append(row['eventType_concrete'])
@@ -151,7 +152,7 @@ def preprocess(log):
         # elif len(df) > 1:
         #    row = segment(df.iloc[-1], df.iloc[-2])
 
-    df = df.append(log[-2:-1], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame(log[-2:-1])], ignore_index=True)
     df.loc[len(df) - 1, 'case_id'] = cid
 
     print(df.head(100).to_string())
@@ -160,14 +161,13 @@ def preprocess(log):
                                                                      timestamp_key='timeStamp')
 
     events3 = {}
-    for k in range(len(df) - 5):
+    for k in range(len(df) - 4):
         changed = False
         r1 = df.loc[k, 'eventType_concrete']
         r2 = df.loc[k + 1, 'eventType_concrete']
         r3 = df.loc[k + 2, 'eventType_concrete']
         r4 = df.loc[k + 3, 'eventType_concrete']
-        r5 = df.loc[k + 4, 'eventType_concrete']
-        triplet = (r1, r2, r3, r4, r5)
+        triplet = (r1, r2, r3, r4)
         for trip in events3:
             if set(trip).issubset(set(triplet)):
                 events3[trip] += 1
@@ -179,7 +179,7 @@ def preprocess(log):
     print("triplets:")
     print(events3)
 
-    df.drop(['eventType_concrete'], axis=1, inplace=True)
+    #df.drop(['eventType_concrete'], axis=1, inplace=True)
     print("dfg:")
     print(dfg)
     print("activities:")
@@ -225,7 +225,7 @@ with open(log_name + '.csv') as log:
     df = pd.read_csv(log, sep=',')
     print("Reading CSV completed: " + str((time.time() - t) * 1000) + " ms")
     df = df.sort_values(by=['timeStamp'], ignore_index=True)
-    df['timeStamp'] = pd.to_datetime(df['timeStamp'])
+    df['timeStamp'] = pd.to_datetime(df['timeStamp'], format='%Y-%m-%dT%H:%M:%S.%fZ')
     t = time.time()
     print("Preprocessing Log...")
     df = preprocess(df)
