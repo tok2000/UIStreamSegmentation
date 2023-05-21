@@ -89,7 +89,7 @@ def segmentation(dataframe, k, activity, time_diff):
         pred[time_diff] = pred[time_diff].total_seconds()
     pred['TAP'] = pred[time_diff]
     if re.search('.*submit.*', pred[activity]):
-        pred[time_diff] = pred[time_diff] * 10
+        pred[time_diff] = pred[time_diff] * 20
     for f in tap_factors:
         pred['TOK_TAP_' + str(f)] = 0
         pred['TOK_TAP_' + str(f) + '_is_cut'] = False
@@ -112,7 +112,7 @@ def segmentation(dataframe, k, activity, time_diff):
             current[time_diff] = current[time_diff].total_seconds()
         current['TAP'] = current[time_diff]
         if re.search('.*submit.*', current[activity]):
-            current[time_diff] = current[time_diff] * 10
+            current[time_diff] = current[time_diff] * 20
         e_1 = current[activity]
         pair = e_0 + '_' + e_1
         for f in tap_factors:
@@ -136,7 +136,7 @@ def segmentation(dataframe, k, activity, time_diff):
                     pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
 
             mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
-            mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
+            mptap_var = ((i - 1) * mptap_var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
                     (pairs[pair][1] - mptap_mean_new) ** 2)) / i
             mptap_st_dev = mptap_var ** 0.5
             mptap_mean = mptap_mean_new

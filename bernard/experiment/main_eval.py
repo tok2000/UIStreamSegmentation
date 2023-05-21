@@ -19,7 +19,7 @@ def real_transformed_log(tap_factors, mptap_factors):
     activity = 'activity'  # CSV_COLUMN: event
     time = 'time'  # CSV_COLUMN: timestamp column
     ground_truth = 'ticket_id'
-    time_diff = 'time_diff'
+    time_diff = 'time_diff_norm'
 
     dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
     return preprocess(dataframe, k, tap_factors, mptap_factors, group_by, activity, time, ground_truth, time_diff)
@@ -329,7 +329,7 @@ warm_ups = [0]  # , 100, 500, 1000, 2000]
 all_delays = ['delay2.0', 'delay1.0', 'delay0.5', 'delay0.45', 'delay0.35', 'delay0.3', 'delay0.25', 'delay0.2',
               'delay0.15', 'delay0.1', 'delay0.05']
 
-
+'''
 df = leno_log('Reimbursement', tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'reimb', tap_factors, mptap_factors, warm_ups)
@@ -340,8 +340,8 @@ evaluate(df, 'student', tap_factors, mptap_factors, warm_ups)
 '''
 df = real_transformed_log(tap_factors, mptap_factors)
 df = df.reset_index()
-evaluate(df, 'real', tap_factors, mptap_factors, warm_ups)
-
+evaluate(df, 'real_norm', tap_factors, mptap_factors, warm_ups)
+'''
 for d in all_delays:
     df = synthetic_log(d, tap_factors, mptap_factors)
     df = df.reset_index()

@@ -136,7 +136,7 @@ def segmentation(dataframe, k, activity, time_diff):
                     pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
 
             mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
-            mptap_var = ((i - 1) * var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
+            mptap_var = ((i - 1) * mptap_var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
                     (pairs[pair][1] - mptap_mean_new) ** 2)) / i
             mptap_st_dev = mptap_var ** 0.5
             mptap_mean = mptap_mean_new
@@ -364,8 +364,8 @@ def generate_roc(df, log_name):
 
 
 segmented_logs = {}
-tap_factors = [0, 0.25, 0.5, 0.75, 1]
-mptap_factors = [0, 0.25, 0.5, 0.75, 1]
+tap_factors = [1]
+mptap_factors = [1]
 warm_ups = [0]  # , 100, 500, 1000, 2000]
 all_delays = ['delay1.0', 'delay0.5', 'delay0.45', 'delay0.35']
 parameter = 'varco'
