@@ -191,6 +191,9 @@ def segmentation(dataframe, k, activity, time_diff):
 
     #print(df.head(10).to_string())
     #print(df.tail(10).to_string())
+    print('mptap_mean', mptap_mean)
+    print('mptap_std', mptap_st_dev)
+    print('mptap_varco', mptap_varco)
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
@@ -378,7 +381,10 @@ def generate_roc(df, log_name):
         auc[c] = roc_auc_score(df['new_guess_col'], df[c])
         # print(fpr[c], tpr[c], thresholds[c])
         # print('auc', c, auc[c])
-        plt.plot(fpr[c], tpr[c], label=c)
+    plt.plot(fpr['TAP'], tpr['TAP'], label='TAP')
+    plt.plot(fpr['MPTAP'], tpr['MPTAP'], label='LCPAP')
+    plt.plot(fpr['TOK_TAP_1'], tpr['TOK_TAP_1'], label='Streaming TAP')
+    plt.plot(fpr['TOK_MPTAP_1'], tpr['TOK_MPTAP_1'], label='Streaming LCPAP')
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -400,9 +406,13 @@ parameter = 'quant_0.99'
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')
-#segmented_logs['real'] = real_transformed_log()
+segmented_logs['real'] = real_transformed_log()
 
-#for d in all_delays:
-#    segmented_logs[d] = synthetic_log(d)
+for d in all_delays:
+    segmented_logs[d] = synthetic_log(d)
 
-evaluate(segmented_logs)
+# evaluate(segmented_logs)
+for log_name in segmented_logs:
+    df = segmented_logs[log_name]
+    auc = generate_roc(df, log_name)
+    print(log_name, auc)

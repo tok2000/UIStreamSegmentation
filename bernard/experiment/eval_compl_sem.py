@@ -89,7 +89,7 @@ def segmentation(dataframe, k, activity, time_diff):
         pred[time_diff] = pred[time_diff].total_seconds()
     pred['TAP'] = pred[time_diff]
     if re.search('.*submit.*', pred[activity]):
-        pred[time_diff] = pred[time_diff] * 20
+        pred[time_diff] = pred[time_diff] * 10
     for f in tap_factors:
         pred['TOK_TAP_' + str(f)] = 0
         pred['TOK_TAP_' + str(f) + '_is_cut'] = False
@@ -114,7 +114,7 @@ def segmentation(dataframe, k, activity, time_diff):
             current[time_diff] = current[time_diff].total_seconds()
         current['TAP'] = current[time_diff]
         if re.search('.*submit.*', current[activity]):
-            current[time_diff] = current[time_diff] * 20
+            current[time_diff] = current[time_diff] * 10
         e_1 = current[activity]
         pair = e_0 + '_' + e_1
         for f in tap_factors:
@@ -133,7 +133,7 @@ def segmentation(dataframe, k, activity, time_diff):
                     pairs[pair][1] = pair_mean_new
 
             for f in mptap_factors:
-                pred['TOK_MPTAP_' + str(f)] = pairs[pair][1] - (mptap_mean + mptap_sem + mptap_varco * f)
+                pred['TOK_MPTAP_' + str(f)] = pairs[pair][1] - (mptap_mean + mptap_sem * f)
                 if pred['TOK_MPTAP_' + str(f)] > 0:
                     pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
 
@@ -369,10 +369,10 @@ def generate_roc(df, log_name):
 
 segmented_logs = {}
 tap_factors = [1]
-mptap_factors = [1]
+mptap_factors = [0, 1, 3, 5, 6, 10]
 warm_ups = [0]  # , 100, 500, 1000, 2000]
 all_delays = ['delay1.0', 'delay0.5', 'delay0.45', 'delay0.35']
-parameter = 'sem_varco'
+parameter = 'sem'
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')

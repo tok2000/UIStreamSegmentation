@@ -163,6 +163,9 @@ def segmentation(dataframe, k, activity, time_diff):
     df = pd.concat([df, pd.DataFrame([pred])], ignore_index=True)
 
     # print(df.head(100).to_string())
+    print('mean', mean)
+    print('std', st_dev)
+    print('varco', varco)
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
@@ -350,7 +353,11 @@ def generate_roc(df, log_name):
         auc[c] = roc_auc_score(df['new_guess_col'], df[c])
         # print(fpr[c], tpr[c], thresholds[c])
         # print('auc', c, auc[c])
-        plt.plot(fpr[c], tpr[c], label=c)
+        # plt.plot(fpr[c], tpr[c], label=c)
+    plt.plot(fpr['TAP'], tpr['TAP'], label='TAP')
+    plt.plot(fpr['MPTAP'], tpr['MPTAP'], label='LCPAP')
+    plt.plot(fpr['TOK_TAP_1'], tpr['TOK_TAP_1'], label='Streaming TAP')
+    plt.plot(fpr['TOK_MPTAP_1'], tpr['TOK_MPTAP_1'], label='Streaming LCPAP')
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -377,4 +384,8 @@ segmented_logs['real'] = real_transformed_log()
 for d in all_delays:
     segmented_logs[d] = synthetic_log(d)
 
-evaluate(segmented_logs)
+# evaluate(segmented_logs)
+#for log_name in segmented_logs:
+#    df = segmented_logs[log_name]
+#    auc = generate_roc(df, log_name)
+#    print(log_name, auc)

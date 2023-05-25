@@ -89,7 +89,7 @@ def segmentation(dataframe, k, activity, time_diff):
         pred[time_diff] = pred[time_diff].total_seconds()
     pred['TAP'] = pred[time_diff]
     if re.search('.*submit.*', pred[activity]):
-        pred[time_diff] = pred[time_diff] * 20
+        pred[time_diff] = pred[time_diff] * 10
     for f in tap_factors:
         pred['TOK_TAP_' + str(f)] = 0
         pred['TOK_TAP_' + str(f) + '_is_cut'] = False
@@ -116,7 +116,7 @@ def segmentation(dataframe, k, activity, time_diff):
             current[time_diff] = current[time_diff].total_seconds()
         current['TAP'] = current[time_diff]
         if re.search('.*submit.*', current[activity]):
-            current[time_diff] = current[time_diff] * 20
+            current[time_diff] = current[time_diff] * 10
         e_1 = current[activity]
         pair = e_0 + '_' + e_1
         for f in tap_factors:
@@ -140,6 +140,8 @@ def segmentation(dataframe, k, activity, time_diff):
                     pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
 
             all_times.append(pairs[pair][1])
+            if len(all_times) > 100:
+                all_times.pop(0)
             if pairs[pair][1] < np.quantile(all_times, 0.95):
                 mean_times.append(pairs[pair][1])
             if mean_times:
@@ -162,6 +164,8 @@ def segmentation(dataframe, k, activity, time_diff):
                     current['TOK_TAP_' + str(f) + '_is_cut'] = True
 
             all_tap_times.append(x_1)
+            if len(all_tap_times) > 100:
+                all_tap_times.pop(0)
             if x_1 < np.quantile(all_tap_times, 0.95):
                 mean_tap_times.append(x_1)
             if mean_tap_times:
@@ -187,6 +191,9 @@ def segmentation(dataframe, k, activity, time_diff):
 
     #print(df.head(10).to_string())
     #print(df.tail(10).to_string())
+    print('mptap_mean', mptap_mean)
+    print('mptap_std', mptap_st_dev)
+    print('mptap_varco', mptap_varco)
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
@@ -374,7 +381,10 @@ def generate_roc(df, log_name):
         auc[c] = roc_auc_score(df['new_guess_col'], df[c])
         # print(fpr[c], tpr[c], thresholds[c])
         # print('auc', c, auc[c])
-        plt.plot(fpr[c], tpr[c], label=c)
+    plt.plot(fpr['TAP'], tpr['TAP'], label='TAP')
+    plt.plot(fpr['MPTAP'], tpr['MPTAP'], label='LCPAP')
+    plt.plot(fpr['TOK_TAP_1'], tpr['TOK_TAP_1'], label='Streaming TAP')
+    plt.plot(fpr['TOK_MPTAP_1'], tpr['TOK_MPTAP_1'], label='Streaming LCPAP')
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -402,3 +412,7 @@ for d in all_delays:
     segmented_logs[d] = synthetic_log(d)
 
 evaluate(segmented_logs)
+for log_name in segmented_logs:
+    df = segmented_logs[log_name]
+    auc = generate_roc(df, log_name)
+    print(log_name, auc)
