@@ -2,6 +2,7 @@ import datetime
 import math
 import pandas as pd
 import numpy as np
+from sklearn import preprocessing
 import warnings
 import editdistance
 
@@ -113,8 +114,13 @@ def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
             pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
         x_1 = current[time_diff]
         time_diffs.append(x_1)
-        if len(time_diffs) > 1000:
-            time_diffs = time_diffs[1:]
+        td = np.array(time_diffs).reshape(-1, 1)
+        #print('orig', td)
+        #print('orig', np.mean(td))
+        scaler = preprocessing.MinMaxScaler()
+        tdf = scaler.fit_transform(td)
+        #print('transf', tdf)
+        #print('trans', np.mean(tdf))
         if not math.isnan(x_1):
             if not math.isnan(x_0):
                 #print('x_0', x_0)
@@ -148,8 +154,9 @@ def segmentation(dataframe, k, tap_factors, mptap_factors, activity, time_diff):
             #x_1 = (x_1 - mean) / st_dev
             #print('x1_norm', x_1)
 
+            x_1 = tdf[-1]
             for f in tap_factors:
-                if x_1 > np.mean(time_diffs) + st_dev * f:
+                if x_1 > np.mean(tdf) + np.std(tdf) * f:
                     current['TOK_TAP_' + str(f) + '_is_cut'] = True
 
             mean_new = (x_1 + i * mean) / (i + 1)
@@ -312,7 +319,7 @@ def evaluate(df, log_name, tap_factors, mptap_factors, warm_ups):
             results = get_metrics(df, results, f, w, 'TAP', med_tap)
 
     print(results.to_string())
-    results.to_excel('./results/tap_res_window_' + log_name + '.xlsx', sheet_name=log_name)
+    results.to_excel('./results/tap_res_sklearn_' + log_name + '.xlsx', sheet_name=log_name)
 
     results = pd.DataFrame()
     results.index = ['traces', 'mptap_corr', 'mptap_wrong', 'prec_mptap', 'recall_mptap', 'fscore_mptap', 'med_mptap',
@@ -326,7 +333,7 @@ def evaluate(df, log_name, tap_factors, mptap_factors, warm_ups):
             results = get_metrics(df, results, f, w, 'MPTAP', med_mptap)
 
     print(results.to_string())
-    #results.to_excel('./results/mptap_res_window_' + log_name + '.xlsx', sheet_name=log_name)
+    #results.to_excel('./results/mptap_res_sklearn_' + log_name + '.xlsx', sheet_name=log_name)
 
 
 tap_factors = [1]
@@ -343,7 +350,7 @@ evaluate(df, 'reimb', tap_factors, mptap_factors, warm_ups)
 df = leno_log('StudentRecord', tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'student', tap_factors, mptap_factors, warm_ups)
-
+'''
 df = real_transformed_log(tap_factors, mptap_factors)
 df = df.reset_index()
 evaluate(df, 'real', tap_factors, mptap_factors, warm_ups)
@@ -352,3 +359,4 @@ for d in all_delays:
     df = synthetic_log(d, tap_factors, mptap_factors)
     df = df.reset_index()
     evaluate(df, d, tap_factors, mptap_factors, warm_ups)
+'''
