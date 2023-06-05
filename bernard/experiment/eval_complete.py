@@ -7,6 +7,7 @@ from sklearn.metrics import roc_curve, roc_auc_score
 import warnings
 import editdistance
 import re
+import time
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
@@ -84,6 +85,7 @@ def preprocess(dataframe, k, group_by, activity, time, ground_truth, time_diff):
 def segmentation(dataframe, k, activity, time_diff):
     df = pd.DataFrame()
 
+    t = time.time()
     pred = dataframe.iloc[0]
     if isinstance(pred[time_diff], datetime.timedelta):
         pred[time_diff] = pred[time_diff].total_seconds()
@@ -104,7 +106,9 @@ def segmentation(dataframe, k, activity, time_diff):
     mptap_st_dev = 1
     mptap_varco = 1
     pairs = {}
+    processing_time_avg = (time.time() - t) * 1000
     for i in range(1, len(dataframe)):
+        t = time.time()
         if i % 500 == 0:
             print(i)
         current = dataframe.iloc[i]
@@ -142,6 +146,8 @@ def segmentation(dataframe, k, activity, time_diff):
             mptap_mean = mptap_mean_new
             mptap_varco = mptap_st_dev / mptap_mean
 
+            processing_time = (time.time() - t) * 1000
+
             for f in tap_factors:
                 current['TOK_TAP_' + str(f)] = x_1 - (mean + varco * f)
                 if current['TOK_TAP_' + str(f)] > 0:
@@ -157,6 +163,7 @@ def segmentation(dataframe, k, activity, time_diff):
         e_0 = e_1
         x_0 = x_1
         pred = current
+        processing_time_avg = (processing_time + i * processing_time_avg) / (i + 1)
     for f in mptap_factors:
         pred['TOK_MPTAP_' + str(f)] = pred[time_diff]
         pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
@@ -167,6 +174,7 @@ def segmentation(dataframe, k, activity, time_diff):
     print('std', st_dev)
     print('varco', varco)
     print('number of pairs', len(pairs))
+    print('avg processing time', processing_time_avg)
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
