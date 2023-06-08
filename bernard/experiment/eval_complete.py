@@ -21,12 +21,13 @@ def real_transformed_log():
     path = '../datasets/real/real_transformed.csv'
     group_by = 'customer_id'  # CSV_COLUMN: Long running cases we would like to partition
     activity = 'activity'  # CSV_COLUMN: event
-    time = 'time'  # CSV_COLUMN: timestamp column
+    time_stamp = 'time'  # CSV_COLUMN: timestamp column
     ground_truth = 'ticket_id'
     time_diff = 'time_diff'
 
     dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
-    return preprocess(dataframe, k, group_by, activity, time, ground_truth, time_diff)
+    dataframe = dataframe[dataframe[time_diff].notna()]
+    return preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth)
 
 
 def synthetic_log(delay):
@@ -37,107 +38,179 @@ def synthetic_log(delay):
 
     group_by = 'journey_id'
     activity = 'event'
-    time = 'timestamp'
+    time_stamp = 'timestamp'
     time_diff = 'time_diff'
 
     # Read CSV
     dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
-    dataframe.sort_values(by=[group_by, time], inplace=True)
+    dataframe.sort_values(by=[group_by, time_stamp], inplace=True)
     dataframe = dataframe[dataframe[time_diff].notna()]
     dataframe['new_guess_col'] = dataframe['last_trace']
     dataframe.drop(['last_trace'], axis=1, inplace=True)
 
-    return segmentation(dataframe, k, activity, time_diff)
+    return segmentation(dataframe, k, activity, time_stamp)
 
 
 def leno_log(log_name):
     k = 50
 
     # STEP 1: reading CSV and preprocessing
-    path = '../../leno/' + log_name + '_preprocessed.csv'
-    group_by = 'userID'  # CSV_COLUMN: Long running cases we would like to partition
+    path = '../../leno/' + log_name + '.csv'
+    group_by = 'timeStamp'  # CSV_COLUMN: Long running cases we would like to partition
     activity = 'eventType'  # CSV_COLUMN: event
-    time = 'timeStamp'  # CSV_COLUMN: timestamp column
+    time_stamp = 'timeStamp'  # CSV_COLUMN: timestamp column
     ground_truth = 'case_id'
     time_diff = 'time_diff'
 
     dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
-    dataframe[time] = pd.to_datetime(dataframe[time])
-    dataframe[time_diff] = dataframe.groupby(group_by)[time].shift(-1) - dataframe[time]
-    dataframe[time_diff] = dataframe[time_diff].fillna(dataframe[time_diff].max())
+    dataframe[time_stamp] = pd.to_datetime(dataframe[time_stamp], format='%Y-%m-%dT%H:%M:%S.%fZ')
+    dataframe = dataframe.sort_values(by=[time_stamp], ignore_index=True)
+    #dataframe[time_diff] = dataframe.groupby(group_by)[time].shift(-1) - dataframe[time]
+    #dataframe[time_diff] = dataframe[time_diff].fillna(dataframe[time_diff].max())
+    dataframe[ground_truth] = 0
+    case_id = 0
+    for i in range(0, len(dataframe)):
+        if dataframe['target.innerText'][i] in ['Add another response', 'Add another response.']:
+            case_id += 1
+        dataframe[ground_truth][i] = case_id
 
-    return preprocess(dataframe, k, group_by, activity, time, ground_truth, time_diff)
+    return preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth)
 
 
-def preprocess(dataframe, k, group_by, activity, time, ground_truth, time_diff):
-    dataframe.sort_values(by=[group_by, time], inplace=True)
-    dataframe = dataframe[dataframe[time_diff].notna()]
+def filtering(row1, row2, activity):
+
+    def mergeNavigationCellCopy(r1, r2, activity):
+
+        # merge getCell or editField and copy events
+        if r1[activity] == "getCell" or r1[activity] == "editCell":
+            r1['timeStamp'] = r2['timeStamp']
+            r1['content'] = r2['content']
+            r1['eventType'] = "copyCell"
+
+        # merge getRange and copy events
+        elif r1[activity] == "getRange":
+            r1['timeStamp'] = r2['timeStamp']
+            r1['content'] = r2['content']
+            r1['eventType'] = "copyRange"
+
+        return r1
+
+    event1 = row1[activity]
+    if event1 == 'copy' or event1 == 'clickTextField' or event1 == 'form_submit' or event1 == 'ignore':
+        return None
+    elif row2[activity] == 'copy':
+        row = mergeNavigationCellCopy(row1, row2, activity)
+    else:
+        row = row1
+
+    if row[activity] == "clickButton" and pd.notnull(row['target.type']):
+        row[activity] = str(row[activity]) + '[' + str(row['target.type']) + ']'
+
+    return row
+
+
+def preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth):
+    dataframe.sort_values(by=[group_by, time_stamp], inplace=True)
+    dataframe = dataframe[dataframe[time_stamp].notna()]
     dataframe['next_guess_col'] = dataframe[ground_truth].shift(-1)
     dataframe['new_guess_col'] = (dataframe['next_guess_col'] != dataframe[ground_truth]) | (
         dataframe['next_guess_col'].isna())
     dataframe.drop(['next_guess_col'], axis=1, inplace=True)
 
-    return segmentation(dataframe, k, activity, time_diff)
+    return segmentation(dataframe, k, activity, time_stamp)
 
     # print(dataframe.head(100).to_string())
 
 
-def segmentation(dataframe, k, activity, time_diff):
+def segmentation(dataframe, k, activity, time_stamp):
     df = pd.DataFrame()
+    time_diff = 'time_diff'
 
     t = time.time()
-    pred = dataframe.iloc[0]
+
+    j = 0
+    pred = filtering(dataframe.iloc[j], dataframe.iloc[j + 1], activity)
+    j += 1
+    succ = filtering(dataframe.iloc[j], dataframe.iloc[j + 1], activity)
+    while succ is None:
+        j += 1
+        succ = filtering(dataframe.iloc[j], dataframe.iloc[j + 1], activity)
+
+    if time_diff not in pred:
+        pred[time_diff] = succ[time_stamp] - pred[time_stamp]
     if isinstance(pred[time_diff], datetime.timedelta):
         pred[time_diff] = pred[time_diff].total_seconds()
+
     pred['TAP'] = pred[time_diff]
+
     if re.search('.*submit.*', pred[activity]):
         pred[time_diff] = pred[time_diff] * 40
+
     for f in tap_factors:
         pred['TOK_TAP_' + str(f)] = 0
         pred['TOK_TAP_' + str(f) + '_is_cut'] = False
+
     e_0 = pred[activity]
     x_0 = pred[time_diff]
     mean = x_0
     var = 1
     st_dev = 1
     varco = 0
-    mptap_mean = 0
+    mptap_mean = x_0
     mptap_var = 0
-    mptap_st_dev = 1
     mptap_varco = 1
     pairs = {}
     processing_time_avg = (time.time() - t) * 1000
-    for i in range(1, len(dataframe)):
-        t = time.time()
+
+    for i in range(j, len(dataframe) - 1):
         if i % 500 == 0:
             print(i)
-        current = dataframe.iloc[i]
-        if isinstance(current[time_diff], datetime.timedelta):
-            current[time_diff] = current[time_diff].total_seconds()
-        current['TAP'] = current[time_diff]
-        if re.search('.*submit.*', current[activity]):
-            current[time_diff] = current[time_diff] * 40
+
+        t = time.time()
+
+        current = filtering(dataframe.iloc[i], dataframe.iloc[i + 1], activity)
+        if current is None:
+            if pred[activity] == 'clickButton[submit]':
+                pred['new_guess_col'] = True
+            continue
+        elif current[activity] == 'copyCell':
+            if pred[activity] == 'clickButton[submit]':
+                pred['new_guess_col'] = True
+
+        if time_diff not in pred:
+            pred[time_diff] = current[time_stamp] - pred[time_stamp]
+        if isinstance(pred[time_diff], datetime.timedelta):
+            pred[time_diff] = pred[time_diff].total_seconds()
+
+        pred['TAP'] = pred[time_diff]
+
+        if re.search('.*submit.*', pred[activity]):
+            pred[time_diff] = pred[time_diff] * 40
+
+        x_0 = pred[time_diff]
         e_1 = current[activity]
         pair = e_0 + '_' + e_1
+
         for f in tap_factors:
-            current['TOK_TAP_' + str(f) + '_is_cut'] = False
+            pred['TOK_TAP_' + str(f) + '_is_cut'] = False
         for f in mptap_factors:
             pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
-        x_1 = current[time_diff]
-        if not math.isnan(x_1):
-            if not math.isnan(x_0):
-                if pair not in pairs:
-                    pairs.update({pair: [1, x_0]})
-                else:
-                    pairs[pair][0] += 1
-                    pair_mean = pairs[pair][1]
-                    pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
-                    pairs[pair][1] = pair_mean_new
+
+        if not math.isnan(x_0):
+            if pair not in pairs:
+                pairs.update({pair: [1, x_0]})
+            else:
+                pairs[pair][0] += 1
+                pair_mean = pairs[pair][1]
+                pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
+                pairs[pair][1] = pair_mean_new
 
             for f in mptap_factors:
                 pred['TOK_MPTAP_' + str(f)] = pairs[pair][1] - (mptap_mean + mptap_varco * f)
                 if pred['TOK_MPTAP_' + str(f)] > 0:
                     pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
+                else:
+                    pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
 
             mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
             mptap_var = ((i - 1) * mptap_var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
@@ -149,27 +222,74 @@ def segmentation(dataframe, k, activity, time_diff):
             processing_time = (time.time() - t) * 1000
 
             for f in tap_factors:
-                current['TOK_TAP_' + str(f)] = x_1 - (mean + varco * f)
-                if current['TOK_TAP_' + str(f)] > 0:
-                    current['TOK_TAP_' + str(f) + '_is_cut'] = True
+                pred['TOK_TAP_' + str(f)] = x_0 - (mean + varco * f)
+                if pred['TOK_TAP_' + str(f)] > 0:
+                    pred['TOK_TAP_' + str(f) + '_is_cut'] = True
+                else:
+                    pred['TOK_TAP_' + str(f) + '_is_cut'] = False
 
-            mean_new = (x_1 + i * mean) / (i + 1)
-            var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_1 - mean_new) ** 2)) / i
+            mean_new = (x_0 + i * mean) / (i + 1)
+            var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_0 - mean_new) ** 2)) / i
             st_dev = var ** 0.5
             mean = mean_new
             varco = st_dev / mean
 
         df = pd.concat([df, pd.DataFrame([pred])], ignore_index=True)
         e_0 = e_1
-        x_0 = x_1
         pred = current
+
         processing_time_avg = (processing_time + i * processing_time_avg) / (i + 1)
-    for f in mptap_factors:
-        pred['TOK_MPTAP_' + str(f)] = pred[time_diff]
-        pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
-    df = pd.concat([df, pd.DataFrame([pred])], ignore_index=True)
+
+    second_last = dataframe.iloc[len(dataframe) - 2]
+    last = dataframe.iloc[len(dataframe) - 1]
+
+    second_last = filtering(second_last, last, activity)
+
+    if second_last is not None:
+        if time_diff not in second_last:
+            second_last[time_diff] = last[time_stamp] - second_last[time_stamp]
+        if isinstance(second_last[time_diff], datetime.timedelta):
+            second_last[time_diff] = second_last[time_diff].total_seconds()
+        second_last['TAP'] = second_last[time_diff]
+
+        for f in tap_factors:
+            second_last['TOK_TAP_' + str(f)] = second_last[time_diff] - (mean + varco * f)
+            second_last['TOK_TAP_' + str(f) + '_is_cut'] = second_last['TOK_TAP_' + str(f)] > 0
+        for f in mptap_factors:
+            second_last['TOK_MPTAP_' + str(f)] = second_last[time_diff] - (mptap_mean + mptap_varco * f)
+            second_last['TOK_MPTAP_' + str(f) + '_is_cut'] = second_last['TOK_MPTAP_' + str(f)] > 0
+
+        df = pd.concat([df, pd.DataFrame([second_last])], ignore_index=True)
+
+    event1 = last[activity]
+    if event1 == 'copy' or event1 == 'clickTextField' or event1 == 'form_submit' or event1 == 'ignore':
+        last = None
+
+    if last is not None:
+        last[time_diff] = 1000000000
+        if 'time_diff_norm' in last:
+            last['time_diff_norm'] = 1000000000
+        last['TAP'] = last[time_diff]
+
+        for f in tap_factors:
+            last['TOK_TAP_' + str(f)] = last[time_diff]
+            last['TOK_TAP_' + str(f) + '_is_cut'] = True
+        for f in mptap_factors:
+            last['TOK_MPTAP_' + str(f)] = last[time_diff]
+            last['TOK_MPTAP_' + str(f) + '_is_cut'] = True
+
+        df = pd.concat([df, pd.DataFrame([last])], ignore_index=True)
+    else:
+        for f in tap_factors:
+            df['TOK_TAP_' + str(f)][-1] = 1000000000
+            df['TOK_TAP_' + str(f) + '_is_cut'][-1] = True
+        for f in mptap_factors:
+            df['TOK_MPTAP_' + str(f)][-1] = 1000000000
+            df['TOK_MPTAP_' + str(f) + '_is_cut'][-1] = True
 
     # print(df.head(100).to_string())
+    # print(df.tail(100).to_string())
+
     print('mean', mean)
     print('std', st_dev)
     print('varco', varco)
@@ -178,6 +298,7 @@ def segmentation(dataframe, k, activity, time_diff):
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
+    # df.to_excel('Reimbursement' + '_preprocessed_stream_40.xlsx', index=False)
     return df
 
 
@@ -382,9 +503,9 @@ def generate_roc(df, log_name):
 segmented_logs = {}
 tap_factors = [1]
 mptap_factors = [1]
-warm_ups = [0]  # , 100, 500, 1000, 2000]
-all_delays = ['delay2.0', 'delay1.0', 'delay0.5', 'delay0.45', 'delay0.35', 'delay0.3', 'delay0.25', 'delay0.2', 'delay0.15', 'delay0.1', 'delay0.05']
-parameter = 'varco_test'
+warm_ups = [0, 10, 50, 100, 250]
+all_delays = ['delay1.0', 'delay0.5']
+parameter = 'warmup_test'
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')
