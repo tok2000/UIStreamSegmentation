@@ -6,7 +6,6 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
 import warnings
 import editdistance
-import re
 import time
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -14,6 +13,7 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
 
 
+# method to process the real-life customer journey log from Bernard et al.
 def real_transformed_log():
     k = 21744
 
@@ -30,6 +30,7 @@ def real_transformed_log():
     return preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth)
 
 
+# method to process the synthetic UI logs by Bernard et al.
 def synthetic_log(delay):
     k = 990
 
@@ -51,6 +52,7 @@ def synthetic_log(delay):
     return segmentation(dataframe, k, activity, time_stamp)
 
 
+# method to process the real-life UI logs from Leno et al.
 def leno_log(log_name):
     k = 50
 
@@ -60,15 +62,14 @@ def leno_log(log_name):
     activity = 'eventType'  # CSV_COLUMN: event
     time_stamp = 'timeStamp'  # CSV_COLUMN: timestamp column
     ground_truth = 'case_id'
-    time_diff = 'time_diff'
 
     dataframe = pd.read_csv(path, nrows=None, dtype={group_by: str, activity: str})
     dataframe[time_stamp] = pd.to_datetime(dataframe[time_stamp], format='%Y-%m-%dT%H:%M:%S.%fZ')
     dataframe = dataframe.sort_values(by=[time_stamp], ignore_index=True)
-    #dataframe[time_diff] = dataframe.groupby(group_by)[time].shift(-1) - dataframe[time]
-    #dataframe[time_diff] = dataframe[time_diff].fillna(dataframe[time_diff].max())
     dataframe[ground_truth] = 0
     case_id = 0
+
+    # manually create the ground truth according to Leno et al.
     for i in range(0, len(dataframe)):
         if dataframe['target.innerText'][i] in ['Add another response', 'Add another response.']:
             case_id += 1
@@ -77,6 +78,7 @@ def leno_log(log_name):
     return preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth)
 
 
+# method to filter the stream from redundant events
 def filtering(row1, row2, activity):
 
     def mergeNavigationCellCopy(r1, r2, activity):
@@ -85,13 +87,13 @@ def filtering(row1, row2, activity):
         if r1[activity] == "getCell" or r1[activity] == "editCell":
             r1['timeStamp'] = r2['timeStamp']
             r1['content'] = r2['content']
-            r1['eventType'] = "copyCell"
+            r1[activity] = "copyCell"
 
         # merge getRange and copy events
         elif r1[activity] == "getRange":
             r1['timeStamp'] = r2['timeStamp']
             r1['content'] = r2['content']
-            r1['eventType'] = "copyRange"
+            r1[activity] = "copyRange"
 
         return r1
 
@@ -109,6 +111,7 @@ def filtering(row1, row2, activity):
     return row
 
 
+# method to sort the log by its timestamp and retrieve the ground truth
 def preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth):
     dataframe.sort_values(by=[group_by, time_stamp], inplace=True)
     dataframe = dataframe[dataframe[time_stamp].notna()]
@@ -119,9 +122,8 @@ def preprocess(dataframe, k, group_by, activity, time_stamp, ground_truth):
 
     return segmentation(dataframe, k, activity, time_stamp)
 
-    # print(dataframe.head(100).to_string())
 
-
+# method for segmenting the stream
 def segmentation(dataframe, k, activity, time_stamp):
     df = pd.DataFrame()
     time_diff = 'time_diff'
@@ -143,28 +145,28 @@ def segmentation(dataframe, k, activity, time_stamp):
 
     pred['TAP'] = pred[time_diff]
 
-    if re.search('.*submit.*', pred[activity]):
-        pred[time_diff] = pred[time_diff] * 40
+    if any(ele in pred[activity] for ele in keyword_set):
+        pred[time_diff] = pred[time_diff] * f
 
-    for f in tap_factors:
-        pred['TOK_TAP_' + str(f)] = 0
-        pred['TOK_TAP_' + str(f) + '_is_cut'] = False
+    pred['TOK_TAP'] = 0
+    pred['TOK_TAP_is_cut'] = False
 
     e_0 = pred[activity]
     x_0 = pred[time_diff]
     mean = x_0
     var = 1
     st_dev = 1
-    varco = 0
     mptap_mean = x_0
-    mptap_var = 1
+    mptap_var = 0
     mptap_st_dev = 1
-    mptap_varco = 1
     pairs = {}
     processing_time_avg = (time.time() - t) * 1000
+
     for i in range(j, len(dataframe) - 1):
-        if i % 500 == 0:
+        if i % 1000 == 0:
             print(i)
+
+        t = time.time()
 
         current = filtering(dataframe.iloc[i], dataframe.iloc[i + 1], activity)
         if current is None:
@@ -177,24 +179,20 @@ def segmentation(dataframe, k, activity, time_stamp):
 
         if time_diff not in pred:
             pred[time_diff] = current[time_stamp] - pred[time_stamp]
-
         if isinstance(pred[time_diff], datetime.timedelta):
             pred[time_diff] = pred[time_diff].total_seconds()
 
         pred['TAP'] = pred[time_diff]
 
-        if re.search('.*submit.*', pred[activity]):
-            pred[time_diff] = pred[time_diff] * 40
+        if any(ele in pred[activity] for ele in keyword_set):
+            pred[time_diff] = pred[time_diff] * f
 
         x_0 = pred[time_diff]
         e_1 = current[activity]
         pair = e_0 + '_' + e_1
 
-        t = time.time()
-        for f in tap_factors:
-            pred['TOK_TAP_' + str(f) + '_is_cut'] = False
-        for f in mptap_factors:
-            pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
+        pred['TOK_TAP_is_cut'] = False
+        pred['TOK_MPTAP_is_cut'] = False
 
         if not math.isnan(x_0):
             if pair not in pairs:
@@ -205,34 +203,24 @@ def segmentation(dataframe, k, activity, time_stamp):
                 pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
                 pairs[pair][1] = pair_mean_new
 
-            for f in mptap_factors:
-                pred['TOK_MPTAP_' + str(f)] = pairs[pair][1] - (mptap_mean + mptap_st_dev * f)
-                if pred['TOK_MPTAP_' + str(f)] > 0:
-                    pred['TOK_MPTAP_' + str(f) + '_is_cut'] = True
-                else:
-                    pred['TOK_MPTAP_' + str(f) + '_is_cut'] = False
+            pred['TOK_MPTAP'] = pairs[pair][1] - (mptap_mean + mptap_st_dev)
+            pred['TOK_MPTAP_is_cut'] = pred['TOK_MPTAP'] > 0
 
             mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
             mptap_var = ((i - 1) * mptap_var + i * ((mptap_mean - mptap_mean_new) ** 2) + (
                     (pairs[pair][1] - mptap_mean_new) ** 2)) / i
             mptap_st_dev = mptap_var ** 0.5
             mptap_mean = mptap_mean_new
-            mptap_varco = mptap_st_dev / mptap_mean
 
             processing_time = (time.time() - t) * 1000
 
-            for f in tap_factors:
-                pred['TOK_TAP_' + str(f)] = x_0 - (mean + st_dev * f)
-                if pred['TOK_TAP_' + str(f)] > 0:
-                    pred['TOK_TAP_' + str(f) + '_is_cut'] = True
-                else:
-                    pred['TOK_TAP_' + str(f) + '_is_cut'] = False
+            pred['TOK_TAP'] = x_0 - (mean + st_dev)
+            pred['TOK_TAP_is_cut'] = pred['TOK_TAP'] > 0
 
             mean_new = (x_0 + i * mean) / (i + 1)
             var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_0 - mean_new) ** 2)) / i
             st_dev = var ** 0.5
             mean = mean_new
-            varco = st_dev / mean
 
         df = pd.concat([df, pd.DataFrame([pred])], ignore_index=True)
         e_0 = e_1
@@ -252,12 +240,11 @@ def segmentation(dataframe, k, activity, time_stamp):
             second_last[time_diff] = second_last[time_diff].total_seconds()
         second_last['TAP'] = second_last[time_diff]
 
-        for f in tap_factors:
-            second_last['TOK_TAP_' + str(f)] = second_last[time_diff] - (mean + st_dev * f)
-            second_last['TOK_TAP_' + str(f) + '_is_cut'] = second_last['TOK_TAP_' + str(f)] > 0
-        for f in mptap_factors:
-            second_last['TOK_MPTAP_' + str(f)] = second_last[time_diff] - (mptap_mean + mptap_st_dev * f)
-            second_last['TOK_MPTAP_' + str(f) + '_is_cut'] = second_last['TOK_MPTAP_' + str(f)] > 0
+        second_last['TOK_TAP'] = second_last[time_diff] - (mean + st_dev)
+        second_last['TOK_TAP_is_cut'] = second_last['TOK_TAP'] > 0
+
+        second_last['TOK_MPTAP'] = second_last[time_diff] - (mptap_mean + mptap_st_dev)
+        second_last['TOK_MPTAP_is_cut'] = second_last['TOK_MPTAP'] > 0
 
         df = pd.concat([df, pd.DataFrame([second_last])], ignore_index=True)
 
@@ -267,35 +254,31 @@ def segmentation(dataframe, k, activity, time_stamp):
 
     if last is not None:
         last[time_diff] = 1000000000
+        if 'time_diff_norm' in last:
+            last['time_diff_norm'] = 1000000000
         last['TAP'] = last[time_diff]
 
-        for f in tap_factors:
-            last['TOK_TAP_' + str(f)] = last[time_diff]
-            last['TOK_TAP_' + str(f) + '_is_cut'] = True
-        for f in mptap_factors:
-            last['TOK_MPTAP_' + str(f)] = last[time_diff]
-            last['TOK_MPTAP_' + str(f) + '_is_cut'] = True
+        last['TOK_TAP'] = last[time_diff]
+        last['TOK_TAP_is_cut'] = True
+
+        last['TOK_MPTAP'] = last[time_diff]
+        last['TOK_MPTAP_is_cut'] = True
 
         df = pd.concat([df, pd.DataFrame([last])], ignore_index=True)
     else:
-        for f in tap_factors:
-            df['TOK_TAP_' + str(f)][-1] = 1000000000
-            df['TOK_TAP_' + str(f) + '_is_cut'][-1] = True
-        for f in mptap_factors:
-            df['TOK_MPTAP_' + str(f)][-1] = 1000000000
-            df['TOK_MPTAP_' + str(f) + '_is_cut'][-1] = True
+        df['TOK_TAP'][-1] = 1000000000
+        df['TOK_TAP_is_cut'][-1] = True
 
-    # print(df.tail(100).to_string())
+        df['TOK_MPTAP'][-1] = 1000000000
+        df['TOK_MPTAP_is_cut'][-1] = True
 
     print('mean', mean)
     print('std', st_dev)
-    print('varco', varco)
     print('number of pairs', len(pairs))
     print('avg processing time', processing_time_avg)
     df = bernard_tap(df, k)
     df = bernard_lcpap(df, k, activity)
     df = df.reset_index()
-    # df.to_excel('Reimbursement' + '_preprocessed_stream_40.xlsx', index=False)
     return df
 
 
@@ -323,6 +306,7 @@ def bernard_lcpap(df, k, activity):
     return df
 
 
+# method to support the computation of the edit distance
 def get_all_uis(df):
     all_uis = []
     for i in range(len(df)):
@@ -330,6 +314,7 @@ def get_all_uis(df):
     return all_uis
 
 
+# method to support the computation of the edit distance
 def find_partitions(df, label):
     partition = []
     section = []
@@ -341,6 +326,7 @@ def find_partitions(df, label):
     return partition
 
 
+# method to compute the edit distance for the evaluation
 def get_edit_distance(df, label):
     edit_distances = []
     all_uis = get_all_uis(df)
@@ -368,9 +354,8 @@ def get_edit_distance(df, label):
     return mean_edit_distance
 
 
+# method to compute the evaluation metrics such as TPR, FPR and F1 score
 def get_statistics(df, label, w):
-    print(label)
-
     traces = 0
     tp = 0
     fp = 0
@@ -413,6 +398,7 @@ def get_statistics(df, label, w):
     return traces, tp, fp, fn, tn, precision, tpr_recall, fpr, fscore
 
 
+# method to evaluate the results and save them into an Excel sheet
 def evaluate(logs):
     with pd.ExcelWriter('./results/results_complete/lcpap_res_' + parameter + '.xlsx') as mptap_writer:
         for log_name in logs:
@@ -426,14 +412,13 @@ def evaluate(logs):
                 label = 'MPTAP'
                 med_mptap = get_edit_distance(df.iloc[w:], label)
                 traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
-                results.insert(0, 'bern_wu_' + str(w),
+                results.insert(0, 'Bernard_wu_' + str(w),
                                [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_mptap], True)
-                for f in mptap_factors:
-                    label = 'TOK_MPTAP_' + str(f)
-                    med_tok = get_edit_distance(df.iloc[w:], label)
-                    traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
-                    results.insert(0, 'fmptap_' + str(f) + '_wu_' + str(w),
-                                   [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_tok], True)
+                label = 'TOK_MPTAP'
+                med_tok = get_edit_distance(df.iloc[w:], label)
+                traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
+                results.insert(0, 'TOK_wu_' + str(w),
+                               [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_tok], True)
 
             print(results.to_string())
             results.to_excel(mptap_writer, sheet_name=log_name)
@@ -449,42 +434,33 @@ def evaluate(logs):
                 label = 'TAP'
                 med_tap = get_edit_distance(df.iloc[w:], label)
                 traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
-                results.insert(0, 'bern_wu_' + str(w),
+                results.insert(0, 'Bernard_wu_' + str(w),
                                [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_tap], True)
-                for f in tap_factors:
-                    label = 'TOK_TAP_' + str(f)
-                    med_tok = get_edit_distance(df.iloc[w:], label)
-                    traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
-                    results.insert(0, 'ftap_' + str(f) + '_wu_' + str(w),
-                                   [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_tok], True)
+                label = 'TOK_TAP'
+                med_tok = get_edit_distance(df.iloc[w:], label)
+                traces, tp, fp, fn, tn, precision, tpr, fpr, fscore = get_statistics(df, label, w)
+                results.insert(0, 'TOK_wu_' + str(w),
+                               [traces, tp, fp, fn, tn, precision, tpr, fpr, auc[label], fscore, med_tok], True)
 
             print(results.to_string())
             results.to_excel(tap_writer, sheet_name=log_name)
         # tap_writer.save()
 
 
+# method to generate the ROC and AUC score for the evaluation and save them as an eps file
 def generate_roc(df, log_name):
     fpr = {}
     tpr = {}
     thresholds = {}
     auc = {}
-    labels = ['TAP', 'MPTAP']
-    for f in tap_factors:
-        labels.append('TOK_TAP_' + str(f))
-        labels.append('TOK_TAP_' + str(f) + '_is_cut')
-    for f in mptap_factors:
-        labels.append('TOK_MPTAP_' + str(f))
-        labels.append('TOK_MPTAP_' + str(f) + '_is_cut')
+    labels = ['TAP', 'MPTAP', 'TOK_TAP', 'TOK_MPTAP']
     for c in labels:
         fpr[c], tpr[c], thresholds[c] = roc_curve(df['new_guess_col'], df[c])
         auc[c] = roc_auc_score(df['new_guess_col'], df[c])
-        # print(fpr[c], tpr[c], thresholds[c])
-        # print('auc', c, auc[c])
-        # plt.plot(fpr[c], tpr[c], label=c)
     plt.plot(fpr['TAP'], tpr['TAP'], label='TAP (AUC: ' + str(round(auc['TAP'], 2)) + ')')
     plt.plot(fpr['MPTAP'], tpr['MPTAP'], label='LCPAP (AUC: ' + str(round(auc['MPTAP'], 2)) + ')')
-    plt.plot(fpr['TOK_TAP_1'], tpr['TOK_TAP_1'], label='Streaming TAP (AUC: ' + str(round(auc['TOK_TAP_1'], 2)) + ')')
-    plt.plot(fpr['TOK_MPTAP_1'], tpr['TOK_MPTAP_1'], label='Our approach (AUC: ' + str(round(auc['TOK_MPTAP_1'], 2)) + ')')
+    plt.plot(fpr['TOK_TAP'], tpr['TOK_TAP'], label='Streaming TAP (AUC: ' + str(round(auc['TOK_TAP'], 2)) + ')')
+    plt.plot(fpr['TOK_MPTAP'], tpr['TOK_MPTAP'], label='Our approach (AUC: ' + str(round(auc['TOK_MPTAP'], 2)) + ')')
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
@@ -497,12 +473,17 @@ def generate_roc(df, log_name):
     return auc
 
 
+# keyword set for keywords out of the IBM guidelines (taken from Rebmann, van der Aa)
+keyword_set = ["submit", "save", "ok", "confirm", "apply", "add", "cancel", "close", "delete", "done", "download",
+               "finish", "next", "ok", "post", "reject", "send", "update", "upload", "fertig", "speichern", "anwenden",
+               "bernehmen"]
+
+
 segmented_logs = {}
-tap_factors = [1]
-mptap_factors = [1]
-warm_ups = [0, 50]
+warm_ups = [0]
+f = 40
 all_delays = ['delay1.0', 'delay0.5']
-parameter = 'stdev'
+parameter = 'standard_dev'
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')
@@ -512,7 +493,3 @@ for d in all_delays:
     segmented_logs[d] = synthetic_log(d)
 
 evaluate(segmented_logs)
-#for log_name in segmented_logs:
-#    df = segmented_logs[log_name]
-#    auc = generate_roc(df, log_name)
-#    print(log_name, auc)
