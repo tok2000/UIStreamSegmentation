@@ -41,11 +41,11 @@ Each Excel sheet contains several columns.
 
 For example, the column 'TOK_wu_50' in the sheet 'delay_1.0' in the Excel file 'buffer-less.xlsx' represents the results of our approach with the buffer-less configuration on the synthetic log with a delay of 1.0 and a warm-up phase of 50 events.
 ### Reproduce
-The obtain all results run the evaluation script using <code>python benchmarking.py</code>, the <code>run</code> function accepts a parameter <code>parallel</code>, which can be set to <code>True</code> to speed things up, but this requires some resources as it runs many processes in parallel.
+To obtain the results from Step 1 (Choice of Semantic Factor), run the evaluation script using <code>python bernard/experiment/eval_compl_semanticfactor.py</code>. The script produces six Excel files containing the evaluation results in the output directory (<code>buffer-less_semantic_fac_x.xlsx</code>) while x is replaced by each tested factor out of the evaluation in the thesis (1, 5, 10, 20, 40, 1000).
 
-* L1 is based on data from  [Leno et al.](https://doi.org/10.6084/m9.figshare.12543587)
-* L2 is based on data from [Leno et al.](https://doi.org/10.6084/m9.figshare.12543587) and [Agostinelli et al.](https://gitlab.uni-mannheim.de/processanalytics/task-recognition-from-event-stream/-/blob/main/logs/raw/agostinelli.xes) 
-* L3 is based on data from Abb & Rehse described [here](https://link.springer.com/chapter/10.1007/978-3-031-16103-2_7).
+To obtain the results from Step 2 (Choice of Configuration), run the following evaluation scripts:
+* Run the script for the buffer-less configuration using <code>python bernard/experiment/eval_compl_buffer-less.py</code>. The script produces one Excel file containing the evaluation results in the output directory (<code>buffer-less.xlsx</code>).
+* Run the script for the standard-deviation-based configuration using <code>python bernard/experiment/eval_compl_stdev.py</code>. The script produces one Excel file containing the evaluation results in the output directory (<code>standard_dev_based.xlsx</code>).
 
 
 ## Misc
