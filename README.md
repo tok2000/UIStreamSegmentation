@@ -27,7 +27,7 @@ The results reported in the thesis can be found in the directory <code>bernard/e
 * 'reimb' refers to the real-life UI log 'Reimbursement' by Leno et al.
 * 'student' refers to the real-life UI log 'StudentRecord' by Leno et al.
 * 'real' refers to the real-life customer-journey log by Bernard et al.
-* 'delay_d' refers to one of the synthetically produced UI logs by Bernard et al. while d refers to the chosen delay. Not all of the results file include all of the delays out of the directory <code>bernard/datasets/synthetic</code>.
+* 'delay_d' refers to one of the synthetically produced UI logs by Bernard et al. while d refers to the chosen delay. Not every results file includes all of the delays out of the directory <code>bernard/datasets/synthetic</code>.
 ### Data
 Our approach was tested on a variety of user interaction and customer journey logs. The raw data and logs used are located in <code>bernard/datasets/</code>.
 
