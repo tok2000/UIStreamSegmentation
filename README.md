@@ -38,6 +38,7 @@ The results reported in the thesis can be found in the directory <code>bernard/e
 Each Excel sheet contains several columns.
 * The columns named 'TOK_wu_x' represent the results of our approach with a warmup of x events.
 * The columns named 'Bernard_wu_x' represent the results of the baseline technique of Bernard et al. in an offline setting with a warmup of x events.
+
 For example, the column 'TOK_wu_50' in the sheet 'delay_1.0' in the Excel file 'buffer-less.xlsx' represents the results of our approach with the buffer-less configuration on the synthetic log with a delay of 1.0 and a warm-up phase of 50 events.
 ### Reproduce
 The obtain all results run the evaluation script using <code>python benchmarking.py</code>, the <code>run</code> function accepts a parameter <code>parallel</code>, which can be set to <code>True</code> to speed things up, but this requires some resources as it runs many processes in parallel.
