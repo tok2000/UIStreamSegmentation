@@ -34,6 +34,7 @@ The results reported in the thesis can be found in the directory <code>bernard/e
 * 'student' refers to the real-life UI log 'StudentRecord' by Leno et al.
 * 'real' refers to the real-life customer-journey log by Bernard et al.
 * 'delay_d' refers to one of the synthetically produced UI logs by Bernard et al., while d refers to the chosen delay. Not every results file includes all of the delays out of the directory <code>bernard/datasets/synthetic</code>.
+
 Each Excel sheet contains several columns.
 * The columns named 'TOK_wu_x' represent the results of our approach with a warmup of x events.
 * The columns named 'Bernard_wu_x' represent the results of the baseline technique of Bernard et al. in an offline setting with a warmup of x events.
