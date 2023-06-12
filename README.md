@@ -23,8 +23,11 @@ The following default directories are used for input and output.
 
 ## Evaluation
 ### Results from the thesis and additional results
-The results reported in the thesis can be found in the directory <code>bernard/experiment/results/results_complete</code>. The directory <code>bernard/experiment/results/additional_results</code> also contains additional results from configurations which were not included in the thesis due to performance or space reasons. All the results are saved in Excel sheets which are produced by the scripts. The results can be obtained in the following way:
-* Each Excel file represents the results of one specific configuration on each of the different datasets which are then represented by the different sheets inside of the Excel file. The sheet name hereby refers to the identifier of the dataset. 'reimb' refers to the real-life UI log 'Reimbursement', 'student' refers to the real-life UI log 'StudentRecord', 'real' refers to the real-life customer-journey log and 'delay_d' refers to one of the synthetically produced UI logs by Bernard et al. while d refers to the chosen delay.
+The results reported in the thesis can be found in the directory <code>bernard/experiment/results/results_complete</code>. The directory <code>bernard/experiment/results/additional_results</code> also contains additional results from configurations which were not included in the thesis due to performance or space reasons. All the results are saved in Excel sheets which are produced by the scripts. The results can be obtained in the following way. Each Excel file represents the results of one specific configuration on each of the different datasets which are then represented by the different sheets inside of the Excel file. The sheet name hereby refers to the identifier of the dataset.
+* 'reimb' refers to the real-life UI log 'Reimbursement' by Leno et al.
+* 'student' refers to the real-life UI log 'StudentRecord' by Leno et al.
+* 'real' refers to the real-life customer-journey log by Bernard et al.
+* 'delay_d' refers to one of the synthetically produced UI logs by Bernard et al. while d refers to the chosen delay. Not all of the results file include all of the delays out of the directory <code>bernard/datasets/synthetic</code>.
 ### Data
 Our approach was tested on a variety of user interaction and customer journey logs. The raw data and logs used are located in <code>bernard/datasets/</code>.
 
