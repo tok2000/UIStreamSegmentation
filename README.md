@@ -12,21 +12,24 @@ This repository contains the implementation, data, evaluation scripts, and resul
 ### Installation instructions
 **The project requires python >= 3.9**
 
-1. create a virtual environment for the project 
-2. install the dependencies in requirements.txt, e.g., using pip <code> pip install -r requirements.txt </code>
+1. Create a virtual environment for the project.
+2. Install the dependencies in requirements.txt, e.g., using pip <code> pip install -r requirements.txt </code>
 
 ### Directories
 The following default directories are used for input and output.
 
-* Input: <code>logs/uilogs</code>
-* Output <code>output/</code>
+* Input: <code>bernard/datasets/</code>
+* Output <code>bernard/experiment/results/</code>
 
 ## Evaluation
-### Results from the paper and additional results
-The results reported in the paper can be obtained using this [Python notebook](https://gitlab.uni-mannheim.de/processanalytics/task-recognition-from-event-stream/-/blob/main/evaluation_paper.ipynb). It also contains additional results that we could not include in the paper due to space reasons.
+### Results from the thesis and additional results
+The results reported in the thesis can be found in the directory <code>bernard/experiment/results/results_complete</code>. The directory <code>bernard/experiment/results/additional_results</code> also contains additional results from configurations which were not included in the thesis due to performance or space reasons.
 ### Data
-Our approach was tested on a collection of user interaction log based on real task executions.
-The raw data and logs used are located in <code>logs/uilogs</code>, we used the script <code>util/data_util.py</code> to create the logs by randomly merging instances of different task types.
+Our approach was tested on a variety of user interaction and customer journey logs. The raw data and logs used are located in <code>bernard/datasets/</code>.
+
+* The directory <code>bernard/datasets/real/</code> contains the real-life customer journey log by Bernard et al.
+* The directory <code>bernard/datasets/synthetic/</code> contains the synthetically produced logs by Bernard et al.
+* The directory <code>bernard/datasets/leno/</code> contains the real-life user interaction logs by Leno et al.
 ### Reproduce
 The obtain all results run the evaluation script using <code>python benchmarking.py</code>, the <code>run</code> function accepts a parameter <code>parallel</code>, which can be set to <code>True</code> to speed things up, but this requires some resources as it runs many processes in parallel.
 
