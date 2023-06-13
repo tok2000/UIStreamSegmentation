@@ -57,7 +57,7 @@ def leno_log(log_name):
     k = 50
 
     # STEP 1: reading CSV and preprocessing
-    path = '../../leno/' + log_name + '.csv'
+    path = '../datasets/leno/' + log_name + '.csv'
     group_by = 'timeStamp'  # CSV_COLUMN: Long running cases we would like to partition
     activity = 'eventType'  # CSV_COLUMN: event
     time_stamp = 'timeStamp'  # CSV_COLUMN: timestamp column

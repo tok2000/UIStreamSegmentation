@@ -6,7 +6,6 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
 import warnings
 import editdistance
-import re
 import time
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -157,10 +156,10 @@ def segmentation(dataframe, k, activity, time_stamp):
     mean = x_0
     var = 1
     st_dev = 1
-    sem = 1
+    varco = 0
     mptap_mean = x_0
     mptap_var = 0
-    mptap_sem = 1
+    mptap_varco = 1
     pairs = {}
     processing_time_avg = (time.time() - t) * 1000
 
@@ -205,7 +204,7 @@ def segmentation(dataframe, k, activity, time_stamp):
                 pair_mean_new = (x_0 + (pairs[pair][0] - 1) * pair_mean) / pairs[pair][0]
                 pairs[pair][1] = pair_mean_new
 
-            pred['TOK_MPTAP'] = pairs[pair][1] - (mptap_mean + mptap_sem)
+            pred['TOK_MPTAP'] = pairs[pair][1] - (mptap_mean + mptap_varco)
             pred['TOK_MPTAP_is_cut'] = pred['TOK_MPTAP'] > 0
 
             mptap_mean_new = (pairs[pair][1] + i * mptap_mean) / (i + 1)
@@ -213,18 +212,18 @@ def segmentation(dataframe, k, activity, time_stamp):
                     (pairs[pair][1] - mptap_mean_new) ** 2)) / i
             mptap_st_dev = mptap_var ** 0.5
             mptap_mean = mptap_mean_new
-            mptap_sem = mptap_st_dev / ((i + 1) ** 0.5)
+            mptap_varco = mptap_st_dev / mptap_mean
 
             processing_time = (time.time() - t) * 1000
 
-            pred['TOK_TAP'] = x_0 - (mean + sem)
+            pred['TOK_TAP'] = x_0 - (mean + varco)
             pred['TOK_TAP_is_cut'] = pred['TOK_TAP'] > 0
 
             mean_new = (x_0 + i * mean) / (i + 1)
             var = ((i - 1) * var + i * ((mean - mean_new) ** 2) + ((x_0 - mean_new) ** 2)) / i
             st_dev = var ** 0.5
             mean = mean_new
-            sem = st_dev / ((i + 1) ** 0.5)
+            varco = st_dev / mean
 
         df = pd.concat([df, pd.DataFrame([pred])], ignore_index=True)
         e_0 = e_1
@@ -244,10 +243,10 @@ def segmentation(dataframe, k, activity, time_stamp):
             second_last[time_diff] = second_last[time_diff].total_seconds()
         second_last['TAP'] = second_last[time_diff]
 
-        second_last['TOK_TAP'] = second_last[time_diff] - (mean + sem)
+        second_last['TOK_TAP'] = second_last[time_diff] - (mean + varco)
         second_last['TOK_TAP_is_cut'] = second_last['TOK_TAP'] > 0
 
-        second_last['TOK_MPTAP'] = second_last[time_diff] - (mptap_mean + mptap_sem)
+        second_last['TOK_MPTAP'] = second_last[time_diff] - (mptap_mean + mptap_varco)
         second_last['TOK_MPTAP_is_cut'] = second_last['TOK_MPTAP'] > 0
 
         df = pd.concat([df, pd.DataFrame([second_last])], ignore_index=True)
@@ -278,7 +277,7 @@ def segmentation(dataframe, k, activity, time_stamp):
 
     print('mean', mean)
     print('std', st_dev)
-    print('sem', sem)
+    print('varco', varco)
     print('number of pairs', len(pairs))
     print('avg processing time', processing_time_avg)
     df = bernard_tap(df, k)
@@ -405,7 +404,7 @@ def get_statistics(df, label, w):
 
 # method to evaluate the results and save them into an Excel sheet
 def evaluate(logs):
-    with pd.ExcelWriter('./results/results_complete/lcpap_res_' + parameter + '.xlsx') as mptap_writer:
+    with pd.ExcelWriter('./results/results_complete/semantic_factor/' + parameter + '.xlsx') as mptap_writer:
         for log_name in logs:
             df = logs[log_name]
             results = pd.DataFrame()
@@ -429,6 +428,7 @@ def evaluate(logs):
             results.to_excel(mptap_writer, sheet_name=log_name)
         # mptap_writer.save()
 
+    '''
     with pd.ExcelWriter('./results/results_complete/tap_res_' + parameter + '.xlsx') as tap_writer:
         for log_name in logs:
             df = logs[log_name]
@@ -450,6 +450,7 @@ def evaluate(logs):
             print(results.to_string())
             results.to_excel(tap_writer, sheet_name=log_name)
         # tap_writer.save()
+    '''
 
 
 # method to generate the ROC and AUC score for the evaluation and save them as an eps file
@@ -485,16 +486,76 @@ keyword_set = ["submit", "save", "ok", "confirm", "apply", "add", "cancel", "clo
 
 
 segmented_logs = {}
-warm_ups = [0]
+warm_ups = [0, 50]
 f = 40
 all_delays = ['delay1.0', 'delay0.5']
-parameter = 'standard_error_mean'
+parameter = 'buffer-less_semantic_fac_' + str(f)
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')
-segmented_logs['real'] = real_transformed_log()
+# segmented_logs['real'] = real_transformed_log()
 
-for d in all_delays:
-    segmented_logs[d] = synthetic_log(d)
+# for d in all_delays:
+#    segmented_logs[d] = synthetic_log(d)
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 1
+warm_ups = [0]
+parameter = 'buffer-less_semantic_fac_' + str(f)
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 5
+parameter = 'buffer-less_semantic_fac_' + str(f)
+
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 10
+parameter = 'buffer-less_semantic_fac_' + str(f)
+
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 20
+parameter = 'buffer-less_semantic_fac_' + str(f)
+
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 40
+parameter = 'buffer-less_semantic_fac_' + str(f)
+
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
+
+evaluate(segmented_logs)
+
+
+segmented_logs = {}
+f = 1000
+parameter = 'buffer-less_semantic_fac_' + str(f)
+
+segmented_logs['reimb'] = leno_log('Reimbursement')
+segmented_logs['student'] = leno_log('StudentRecord')
 
 evaluate(segmented_logs)

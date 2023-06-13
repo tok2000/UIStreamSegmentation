@@ -57,7 +57,7 @@ def leno_log(log_name):
     k = 50
 
     # STEP 1: reading CSV and preprocessing
-    path = '../../leno/' + log_name + '.csv'
+    path = '../datasets/leno/' + log_name + '.csv'
     group_by = 'timeStamp'  # CSV_COLUMN: Long running cases we would like to partition
     activity = 'eventType'  # CSV_COLUMN: event
     time_stamp = 'timeStamp'  # CSV_COLUMN: timestamp column
@@ -400,7 +400,7 @@ def get_statistics(df, label, w):
 
 # method to evaluate the results and save them into an Excel sheet
 def evaluate(logs):
-    with pd.ExcelWriter('./results/results_complete/lcpap_res_' + parameter + '.xlsx') as mptap_writer:
+    with pd.ExcelWriter('./results/results_complete/' + parameter + '.xlsx') as mptap_writer:
         for log_name in logs:
             df = logs[log_name]
             results = pd.DataFrame()
@@ -424,6 +424,7 @@ def evaluate(logs):
             results.to_excel(mptap_writer, sheet_name=log_name)
         # mptap_writer.save()
 
+    '''
     with pd.ExcelWriter('./results/results_complete/tap_res_' + parameter + '.xlsx') as tap_writer:
         for log_name in logs:
             df = logs[log_name]
@@ -445,6 +446,7 @@ def evaluate(logs):
             print(results.to_string())
             results.to_excel(tap_writer, sheet_name=log_name)
         # tap_writer.save()
+    '''
 
 
 # method to generate the ROC and AUC score for the evaluation and save them as an eps file
@@ -483,7 +485,7 @@ segmented_logs = {}
 warm_ups = [0]
 f = 40
 all_delays = ['delay1.0', 'delay0.5']
-parameter = 'standard_dev'
+parameter = 'standard_dev_based'
 
 segmented_logs['reimb'] = leno_log('Reimbursement')
 segmented_logs['student'] = leno_log('StudentRecord')
