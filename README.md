@@ -43,7 +43,7 @@ To obtain all results from the thesis, run the evaluation script using <code>pyt
 * The results for the baseline comparison are saved into <code>bernard/experiment/results/results_complete/baseline_comp.xlsx</code>.
 * The directory <code>bernard/experiment/results/results_complete/different_k</code> contains four Excel files for the evaluation of the hyper-parameter K for the evaluation of Bernard et al. which are named <code>bernard_k_x.xlsx</code> while x is replaced by each tested parameter K out of the evaluation in the thesis (20, 75, 100, 200).
 
-To obtain only the results from Step 1 (Choice of Semantic Factor), run the evaluation script using <code>python bernard/experiment/eval_compl_semanticfactor.py</code>. The results are then saved into Excel files as already mentioned above.
+To obtain only the results from Step 1 (Choice of Semantic Factor), run the evaluation script using <code>python bernard/experiment/eval_semanticfactor.py</code>. The results are then saved into Excel files as already mentioned above.
 
 To obtain only the results from Step 2 (Choice of Configuration), run the evaluation script using <code>python bernard/experiment/eval_compl_config.py</code>. The results are then saved into Excel files as already mentioned above.
 
