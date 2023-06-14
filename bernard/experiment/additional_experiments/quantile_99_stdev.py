@@ -158,7 +158,8 @@ def segmentation(dataframe, k, activity, time_stamp):
     st_dev = 1
     varco = 0
     mptap_mean = x_0
-    mptap_var = 0
+    mptap_var = 1
+    mptap_st_dev = 1
     pairs = {}
     buffer = [x_0]
     c = 1

@@ -410,7 +410,7 @@ def evaluate(logs):
             results = pd.DataFrame()
             results.index = ['traces', 'tp', 'fp', 'fn', 'tn', 'prec', 'tpr_recall', 'fpr', 'auc', 'fscore', 'med']
 
-            df.to_csv('./results/results_complete/' + log_name + '_segmented_' + parameter + '.csv', sep=',', index=False)
+            # df.to_csv('./results/results_complete/' + log_name + '_segmented_' + parameter + '.csv', sep=',', index=False)
             auc = generate_roc(df, log_name)
 
             for w in warm_ups:
